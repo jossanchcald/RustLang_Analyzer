@@ -5,11 +5,66 @@ import re
 # Lista global para almacenar los errores y posteriormente enviarlos al log
 lexicalErrors = []
 
+ # Diccionario de palabras reservadas
+reserved_words = { 
+    'if' : 'IF',
+    'else' : 'ELSE',
+    'fn' : 'FUNCTION',
+    'let' : 'DECLARATION',
+    'const' : 'CONSTANT',
+    'static' : 'STATIC',
+    'match' : 'MATCH',
+    'for' : 'FOR',
+    'while' : 'WHILE',
+    'break' : 'BREAK',
+    'continue' : 'CONTINUE',
+    'loop' : 'LOOP',
+    'return' : "RETURN",
+    'mut' : 'MUT',
+    'struct' : 'STRUCT',
+    'self' : 'SELF'
+
+}
+
 tokens = [
     'INTEGER',
     #'FLOAT',
     #'ANYID_START'
-]
+    
+    # Operadores
+    'PLUS',
+    'MINUS',
+    'MULT',
+    'DIV',
+    'MOD',
+
+    # Delimitadores
+    'PARENR',
+    'PARENL',
+    'BRACER',
+    'BRACEL',
+    'BRACKR',
+    'BRACKL',
+
+    'IDENTIFIER'
+] + list(reserved_words.values())
+
+# Reglas de expresiones regulares para tokens simples
+# Operadores 
+t_PLUS = r'\+'
+t_MINUS = r'-'
+t_MULT = r'\*'
+t_DIV = r'/'
+t_MOD = r'%'
+
+# Delimitadores
+t_PARENL = r'\('
+t_PARENR = r'\)'
+t_BRACEL = r'\{'
+t_BRACER = r'\}'
+t_BRACKL = r'\['
+t_BRACKR = r'\]'
+
 
 # Caracteres ignorados (espacios y tabulaciones)
 t_ignore = ' \t'
@@ -74,6 +129,15 @@ def t_INT_DEC(t):
     return t
 
 # Fin Parte de Josue Sanchez Calderon
+
+# Inicio Parte de Leiner David Saltos Penafiel
+
+regexID = r'[a-zA-Z_][a-zA-Z0-9_]*'
+@TOKEN(regexID)
+def t_IDENTIFIER(t):
+    t.type = reserved_words.get(t.value, 'IDENTIFIER')
+    return t
+
 
 
 # regla para contar lineas para los mensajes de error
