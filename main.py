@@ -1,7 +1,7 @@
 import sys
 from datetime import datetime
 from pathlib import Path
-#from Analyzers.lexical import lexer as lexicalAnalyzer
+from Analyzers.lexical import lexer as lexicalAnalyzer
 from Analyzers.lexical import lexicalErrors
 
 actualRoute = Path(__file__).resolve().parent
@@ -25,20 +25,27 @@ def createLogFile(userName, content):
 
 #TODO en pruebas
 def analyzeRustAlgo(rustFile, userName):
-    #lexicalAnalyzer.input(readFile(rustFile))
-    #tokens_procesados = []
-    #for tok in lexicalAnalyzer:
-    #    tokens_procesados.append(f"[{tok.type}] -> {tok.value}")
+    lexicalErrors.clear()  # Limpia errores previos por si se hacen varias pruebas
+    lexicalAnalyzer.input(readFile(rustFile))
+    
+    tokens_procesados = ["[[[[[ TOKENS RECONOCIDOS ]]]]]"]
+    for tok in lexicalAnalyzer:
+        tokens_procesados.append(f"[{tok.type}] -> {tok.value} (Línea {tok.lineno})")
         
-    #createLogFile(userName, "\n".join(tokens_procesados))
-    print()
+    if lexicalErrors:
+        tokens_procesados.append("\n [[[[[ ERRORES LÉXICOS ]]]]]")
+        for err in lexicalErrors:
+            tokens_procesados.append(str(err))
+            
+    createLogFile(userName, "\n".join(tokens_procesados))
+    print(f"\nAnálisis completado. Revise la carpeta 'Logs'.")
 
 def main():
     print("\nAnalizador léxico de algoritmos de lenguaje en Rust\n\n" \
     "Para poder utilizar el analizador: \n" \
     "\t> Identifiquese con un username o nombre.\n" \
     "\t> Ingrese el nombre del archivo Rust donde se encuentra el algoritmo a evaluar.\n" \
-    "\t\tPD: Debe ser de extension '.rs'\n")
+    "\t\tPD: Debe ser de extension '.rs', si el archivo se encuentra en la carpeta Algorithms ingrese 'Algorithms/NombreArchivo'\n")
 
     userName = input("Ingrese su nombre: ")
     userNameNoBS = "".join(userName.split())
