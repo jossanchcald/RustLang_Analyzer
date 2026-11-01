@@ -12,8 +12,8 @@ def readFile(rustFile):
         with open(rustFile + '.rs', 'r', encoding='utf-8') as f:
             return f.read()
     except FileNotFoundError:
-        print(f"\nError: el archivo '{rustFile}.rs' no existe.")
-        sys.exit(1)
+        print(f"\nError: el archivo '{rustFile}.rs' no existe. Intente nuevamente.")
+        return None
 
 def createLogFile(userName, content):
     now = datetime.now()
@@ -26,7 +26,7 @@ def createLogFile(userName, content):
 #TODO en pruebas
 def analyzeRustAlgo(rustFile, userName):
     lexicalErrors.clear()  # Limpia errores previos por si se hacen varias pruebas
-    lexicalAnalyzer.input(readFile(rustFile))
+    lexicalAnalyzer.input(rustFile)
     
     tokens_procesados = ["[[[[[ TOKENS RECONOCIDOS ]]]]]"]
     for tok in lexicalAnalyzer:
@@ -52,10 +52,17 @@ def main():
     userName = input("Ingrese su nombre: ")
     userNameNoBS = "".join(userName.split())
 
-    fileName = input("\nIngrese el nombre del archivo Rust (.rs): ")
-    rustfName = fileName.removesuffix('.rs')
+    fileContent = None
 
-    analyzeRustAlgo(rustfName, userNameNoBS)
+    while (fileContent is None):  
+        fileName = input("\n\nIngrese el nombre del archivo Rust (.rs): ").strip()
+        if (fileName is None):
+            continue
+
+        rustfName = fileName.removesuffix('.rs')
+        fileContent = readFile(rustfName)
+
+    analyzeRustAlgo(fileContent, userNameNoBS)
 
 
 if __name__ == '__main__':
