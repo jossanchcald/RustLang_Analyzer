@@ -19,8 +19,8 @@ def createLogFile(userName, content):
     now = datetime.now()
     logFolder.mkdir(parents=True, exist_ok=True)
 
-    logfName = f"lexico-{userName}-{now.strftime('%d-%m-%Y-%Hh%M')}.log"
-    with open(logFolder / logfName, 'w') as logFile:
+    logfName = f"lexico-{userName}-{now.strftime('%d-%m-%Y-%Hh%M')}.txt"
+    with open(logFolder / logfName, 'w', encoding='utf-8') as logFile:
         logFile.write(content)
 
 #TODO en pruebas
