@@ -1,6 +1,6 @@
 import ply.lex as lex
 from ply.lex import TOKEN # Para creacion de regEx con variables
-import re
+import regex as re
 
 # Lista global para almacenar los errores y posteriormente enviarlos al log
 lexicalErrors = []
@@ -22,13 +22,19 @@ reserved_words = {
     'return' : "RETURN",
     'mut' : 'MUT',
     'struct' : 'STRUCT',
-    'self' : 'SELF'
+    'self' : 'SELF',
+
+    'true': 'BOOLEAN_T',
+    'false' : 'BOOLEAN_F'
 
 }
 
 tokens = [
     'INTEGER',
     'FLOAT',
+    'CHAR',
+    #'STRING',
+    'BOOLEAN',
     #'ANYID_START'
     
     # Operadores
@@ -69,10 +75,22 @@ t_BRACKR = r'\]'
 # Caracteres ignorados (espacios y tabulaciones)
 t_ignore = ' \t'
 
-# Inicio Parte de Josue Sanchez Calderon
+# Inicio parte de Josue Sanchez Calderon
 
 def removeSufix(text, sufix_re):
     return sufix_re.sub('', text)
+
+
+# Characters
+regexSingleCharUnicodeStandard = r'[\U00000000-\U0000D7FF\U0000E000-\U0010FFFF]'
+regexChar = fr'\'{regexSingleCharUnicodeStandard}\''
+
+@TOKEN(regexChar)
+def t_CHAR(t):
+    t.value = str(t.value)
+
+    return t
+
 
 # Integers
 intSufix = r'(u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize)'
@@ -159,7 +177,17 @@ def t_INT_DEC(t):
 
 
 
-# Fin Parte de Josue Sanchez Calderon
+# # Strings TODO sin terminar
+# regexString = fr'(\"){regexSingleCharUnicodeStandard}{regexSingleCharUnicodeStandard}+(\")'
+
+# @TOKEN(regexString)
+# def t_STRING(t):
+#     t.value = str(t.value)
+
+#     return t
+
+
+# Fin parte de Josue Sanchez Calderon
 
 # Inicio Parte de Leiner David Saltos Penafiel
 
@@ -167,6 +195,10 @@ regexID = r'[a-zA-Z_][a-zA-Z0-9_]*'
 @TOKEN(regexID)
 def t_IDENTIFIER(t):
     t.type = reserved_words.get(t.value, 'IDENTIFIER')
+
+    if ((t.type == 'BOOLEAN_T') | (t.type == 'BOOLEAN_F')): # Booleans (Josue)
+        t.type = "BOOLEAN"
+
     return t
 
 
