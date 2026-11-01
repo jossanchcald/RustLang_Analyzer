@@ -35,7 +35,7 @@ def analyzeRustAlgo(rustFile, userName):
     if lexicalErrors:
         tokens_procesados.append("\n [[[[[ ERRORES LÉXICOS ]]]]]")
         for err in lexicalErrors:
-            tokens_procesados.append(str(err))
+            tokens_procesados.append(err["mensaje"] if "mensaje" in err else str(err))
             
     createLogFile(userName, "\n".join(tokens_procesados))
     print(f"\nAnálisis completado. Revise la carpeta 'Logs'.")

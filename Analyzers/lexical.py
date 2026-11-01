@@ -76,7 +76,9 @@ tokens = [
     'COLON',
     'SEMICOLON',
     'COMMA',
-    'IDENTIFIER'
+    'IDENTIFIER',
+    'RAW_IDENTIFIER',
+    'UNDERSCORE'
 ] + list(reserved_words.values())
 
 # Reglas de expresiones regulares para tokens simples
@@ -238,6 +240,44 @@ def t_INT_DEC(t):
 
 
 # Fin parte de Josue Sanchez Calderon
+
+# Inicio parte de Jared Beltran
+
+# Columna de una posicion dentro del texto que se analiza
+def findColumn(lexdata, lexpos):
+    lineStart = lexdata.rfind('\n', 0, lexpos) + 1
+    return lexpos - lineStart + 1
+
+
+def addLexicalError(lexdata, lineno, lexpos, lexeme, message):
+    lexicalErrors.append({
+        "caracter": lexeme,
+        "linea": lineno,
+        "columna": findColumn(lexdata, lexpos),
+        "posicion": lexpos,
+        "mensaje": f"Error léxico (línea {lineno}, columna {findColumn(lexdata, lexpos)}): {message}"
+    })
+
+# Guion bajo solo no es un identificador valido en Rust
+@TOKEN(r'_(?![a-zA-Z0-9_])')
+def t_UNDERSCORE(t):
+    return t
+
+# Raw identifier
+# Antes de t_IDENTIFIER: si no, el lexer toma la 'r' como un identificador
+regexRawID = r'r\#[a-zA-Z_][a-zA-Z0-9_]*'
+rawIDReserved = ('crate', 'self', 'super', 'Self', '_')
+
+@TOKEN(regexRawID)
+def t_RAW_IDENTIFIER(t):
+    name = t.value[2:]
+    if name in rawIDReserved:
+        addLexicalError(t.lexer.lexdata, t.lexer.lineno, t.lexpos, t.value,
+                        f"'{t.value}' no es un raw identifier válido ('{name}' no puede usarse con r#)")
+        return None
+    return t
+
+# Fin parte de Jared Beltran
 
 # Inicio Parte de Leiner David Saltos Penafiel
 
