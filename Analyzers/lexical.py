@@ -1,5 +1,5 @@
 import ply.lex as lex
-from ply.lex import TOKEN # Para creacion de regEx con variables
+from ply.lex import TOKEN 
 import regex as re
 
 # Lista global para almacenar los errores y posteriormente enviarlos al log
@@ -26,7 +26,6 @@ reserved_words = {
 
     'true': 'BOOLEAN_T',
     'false' : 'BOOLEAN_F'
-
 }
 
 tokens = [
@@ -44,6 +43,14 @@ tokens = [
     'DIV',
     'MOD',
 
+    # Comparadores
+    'EQUAL_TO',
+    'NOT_EQUAL_TO',
+    'GREATER_THAN',
+    'LESS_THAN',
+    'GREATER_EQUAL_THAN',
+    'LESS_EQUAL_THAN',
+
     # Delimitadores
     'PARENR',
     'PARENL',
@@ -52,6 +59,23 @@ tokens = [
     'BRACKR',
     'BRACKL',
 
+    # Asignacion
+    'EQUAL',
+    'PLUS_EQUAL',
+    'MINUS_EQUAL',
+    'TIMES_EQUAL',
+    'DIV_EQUAL',
+    'MOD_EQUAL',
+
+    # Operadores logicos
+    'AND',
+    'OR',
+    'NOT',
+
+    'ARROW',
+    'COLON',
+    'SEMICOLON',
+    'COMMA',
     'IDENTIFIER'
 ] + list(reserved_words.values())
 
@@ -63,6 +87,14 @@ t_MULT = r'\*'
 t_DIV = r'/'
 t_MOD = r'%'
 
+#Comparadores
+t_EQUAL_TO = r'='
+t_NOT_EQUAL_TO = r'!='
+t_GREATER_THAN = r'>'
+t_LESS_THAN = r'<'
+t_GREATER_EQUAL_THAN = r'>='
+t_LESS_EQUAL_THAN = r'<='
+
 # Delimitadores
 t_PARENL = r'\('
 t_PARENR = r'\)'
@@ -71,6 +103,24 @@ t_BRACER = r'\}'
 t_BRACKL = r'\['
 t_BRACKR = r'\]'
 
+# Asignacion
+t_EQUAL = r'='
+t_PLUS_EQUAL = r'\+='
+t_MINUS_EQUAL = r'-='
+t_TIMES_EQUAL = r'\*='
+t_DIV_EQUAL = r'/='
+t_MOD_EQUAL = r'%='
+
+
+# Operadores logicos 
+t_AND = r'&&'
+t_OR = r'\|\|'
+t_NOT = r'!'
+
+t_ARROW = r'\->'
+t_COLON = r':'
+t_SEMICOLON = r';'
+t_COMMA = r','
 
 # Caracteres ignorados (espacios y tabulaciones)
 t_ignore = ' \t'
