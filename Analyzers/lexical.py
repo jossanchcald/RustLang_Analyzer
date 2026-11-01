@@ -285,6 +285,11 @@ def t_INT_DEC(t):
 
 # Inicio parte de Jared Beltran
 
+# Estado exclusivo para recorrer los comentarios de bloque, ademas permite anidarlos
+states = (
+    ('comment', 'exclusive'),
+)
+
 # Columna de una posicion dentro del texto que se analiza
 def findColumn(lexdata, lexpos):
     lineStart = lexdata.rfind('\n', 0, lexpos) + 1
@@ -299,6 +304,15 @@ def addLexicalError(lexdata, lineno, lexpos, lexeme, message):
         "posicion": lexpos,
         "mensaje": f"Error léxico (línea {lineno}, columna {findColumn(lexdata, lexpos)}): {message}"
     })
+
+# Debe llamarse al terminar de recorrer los tokens, porque avisa de comentarios de bloque sin cerrar al final del codigo
+def checkUnclosedComments():
+    if lexer.lexstate == 'comment':
+        for (line, pos) in reversed(lexer.commentStack):
+            addLexicalError(lexer.lexdata, line, pos, '/*',
+                            "comentario de bloque sin cerrar (falta '*/')")
+        lexer.commentStack = []
+        lexer.begin('INITIAL')
 
 # Guion bajo solo no es un identificador valido en Rust
 @TOKEN(r'_(?![a-zA-Z0-9_])')
@@ -318,6 +332,51 @@ def t_RAW_IDENTIFIER(t):
                         f"'{t.value}' no es un raw identifier válido ('{name}' no puede usarse con r#)")
         return None
     return t
+
+# Comentarios
+# Inicio comentario de una linea. No incluye saltos de linea
+def t_LINE_COMMENT(t):
+    r'//[^\n]*'
+    pass
+
+
+# Inicio de comentario de bloque, aqui pasa al estado 'comment'
+def t_COMMENT_START(t):
+    r'/\*'
+    t.lexer.commentStack = [(t.lexer.lineno, t.lexpos)]
+    t.lexer.begin('comment')
+
+
+# Apertura anidada dentro de un comentario
+def t_comment_open(t):
+    r'/\*'
+    t.lexer.commentStack.append((t.lexer.lineno, t.lexpos))
+
+
+# Dentro de un comentario al momento de su cierre. Si todos estan cerrados vuelve al estado Inicial
+def t_comment_close(t):
+    r'\*/'
+    t.lexer.commentStack.pop()
+    if not t.lexer.commentStack:
+        t.lexer.begin('INITIAL')
+
+
+def t_comment_newline(t):
+    r'\n+'
+    t.lexer.lineno += t.value.count('\n')
+
+
+# Cualquier otro contenido del comentario se descarta como se pidio en la asignacion (AV)
+def t_comment_content(t):
+    r'[^/*\n]+|[/*]'
+    pass
+
+# Estandar que pide PLY para manejar errores
+
+t_comment_ignore = ''
+
+def t_comment_error(t):
+    t.lexer.skip(1)
 
 # Fin parte de Jared Beltran
 

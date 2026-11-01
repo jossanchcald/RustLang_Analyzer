@@ -2,7 +2,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from Analyzers.lexical import lexer as lexicalAnalyzer
-from Analyzers.lexical import lexicalErrors
+from Analyzers.lexical import lexicalErrors, checkUnclosedComments
 
 actualRoute = Path(__file__).resolve().parent
 logFolder = actualRoute / "Logs"
@@ -32,6 +32,8 @@ def analyzeRustAlgo(rustFile, userName):
     for tok in lexicalAnalyzer:
         tokens_procesados.append(f"[{tok.type}] -> {tok.value} (Línea {tok.lineno})")
         
+    checkUnclosedComments()  # Comentarios de bloque sin cerrar
+
     if lexicalErrors:
         tokens_procesados.append("\n [[[[[ ERRORES LÉXICOS ]]]]]")
         for err in lexicalErrors:
