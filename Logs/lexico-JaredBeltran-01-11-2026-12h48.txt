@@ -1,0 +1,26 @@
+[[[[[ TOKENS RECONOCIDOS ]]]]]
+[FUNCTION] -> fn (Línea 2)
+[IDENTIFIER] -> main (Línea 2)
+[PARENL] -> ( (Línea 2)
+[PARENR] -> ) (Línea 2)
+[BRACEL] -> { (Línea 2)
+[DECLARATION] -> let (Línea 3)
+[EQUAL_TO] -> = (Línea 3)
+[INTEGER] -> 1 (Línea 3)
+[SEMICOLON] -> ; (Línea 3)
+[DECLARATION] -> let (Línea 4)
+[EQUAL_TO] -> = (Línea 4)
+[INTEGER] -> 2 (Línea 4)
+[SEMICOLON] -> ; (Línea 4)
+[DECLARATION] -> let (Línea 5)
+[IDENTIFIER] -> valor (Línea 5)
+[EQUAL_TO] -> = (Línea 5)
+[INTEGER] -> 3 (Línea 5)
+[INTEGER] -> 4 (Línea 5)
+[SEMICOLON] -> ; (Línea 5)
+
+ [[[[[ ERRORES LÉXICOS ]]]]]
+Error léxico (línea 3, columna 9): 'r#self' no es un raw identifier válido ('self' no puede usarse con r#)
+Error léxico (línea 4, columna 9): 'r#crate' no es un raw identifier válido ('crate' no puede usarse con r#)
+{'caracter': '@', 'linea': 5, 'posicion': 145}
+Error léxico (línea 6, columna 5): comentario de bloque sin cerrar (falta '*/')

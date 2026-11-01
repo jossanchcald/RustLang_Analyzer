@@ -24,4 +24,22 @@ fn main() {
     let r#for = [1, 2, 3];
     let tupla = (edad_1, r#loop);
     let _ = calcular_total(edad_1, r#loop, 0);
+
+    while contador <= MAX_INTENTOS {
+        if contador == 2 {
+            contador += 1;
+            continue;
+        } else if contador >= 5 {
+            break;
+        } else {
+            contador += 1;
+        }
+    }
+
+    loop {
+        contador -= 1;
+        if contador < 0 { break; }
+    }
+    let _x = r#for[0];
+    let _y = tupla;
 }
