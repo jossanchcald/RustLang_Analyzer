@@ -234,6 +234,9 @@ def t_CHAR(t):
 @TOKEN(regexRawString)
 def t_RAW_STRING(t):
 
+    if (str.find(t.value, "\U0000000A")):
+        t.lexer.lineno += t.value.count("\n")
+
     cleanText = t.value + ""
     t.value = str(cleanText)
     return t
