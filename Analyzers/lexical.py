@@ -23,9 +23,21 @@ reserved_words = {
     'mut' : 'MUT',
     'struct' : 'STRUCT',
     'self' : 'SELF',
+    'enum' : 'ENUM',
+    'in' : 'IN',
+    'as' : 'AS',
 
     'true': 'BOOLEAN_T',
     'false' : 'BOOLEAN_F'
+}
+
+# Nombres de los tipos de datos
+typesNames = {
+    'i8', 'i16', 'i32', 'i64', 'i128', 'isize',
+    'u8', 'u16', 'u32', 'u64', 'u128', 'usize',
+    'f32', 'f64',
+    'bool', 'char', 'str',
+    'String', 'Vec', 'HashMap', 'Option', 'Result'
 }
 
 tokens = [
@@ -76,6 +88,12 @@ tokens = [
     'COLON',
     'SEMICOLON',
     'COMMA',
+    'DOUBLE_COLON',
+    'RANGE',
+    'PERIOD',
+    'AMPERSAND',
+    'PIPE',
+    'TYPE',
     'IDENTIFIER',
     'RAW_IDENTIFIER',
     'UNDERSCORE'
@@ -90,7 +108,7 @@ t_DIV = r'/'
 t_MOD = r'%'
 
 #Comparadores
-t_EQUAL_TO = r'='
+t_EQUAL_TO = r'(==)'
 t_NOT_EQUAL_TO = r'!='
 t_GREATER_THAN = r'>'
 t_LESS_THAN = r'<'
@@ -115,14 +133,19 @@ t_MOD_EQUAL = r'%='
 
 
 # Operadores logicos 
-t_AND = r'&&'
-t_OR = r'\|\|'
+t_AND = r'(&&)'
+t_OR = r'(\|\|)'
 t_NOT = r'!'
 
-t_ARROW = r'\->'
+t_ARROW = r'(\->)'
 t_COLON = r':'
 t_SEMICOLON = r';'
 t_COMMA = r','
+t_DOUBLE_COLON = r'(::)'
+t_PERIOD = r'(\.)'
+t_AMPERSAND = r'&'
+t_PIPE = r'\|'
+t_RANGE = r'(\.\.)'
 
 # Caracteres ignorados (espacios y tabulaciones)
 t_ignore = ' \t'
@@ -389,6 +412,9 @@ def t_IDENTIFIER(t):
 
     if ((t.type == 'BOOLEAN_T') | (t.type == 'BOOLEAN_F')):
         t.type = "BOOLEAN"
+
+    elif ((t.type == 'IDENTIFIER') & (t.value in typesNames)):
+        t.type = 'TYPE'
 
     return t
 
