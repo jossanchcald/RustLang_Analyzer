@@ -45,6 +45,7 @@ tokens = [
     'FLOAT',
     'CHAR',
     'STRING',
+    'RAW_STRING',
     'BOOLEAN',
     'BYTE_LITERAL',
     
@@ -206,7 +207,14 @@ regexByteLiteral = fr'b\'({regexASCIICharAccepted}|{regexByteEscape})\''
 regexSCUSStringAccepted = r'[\U00000000-\U0000000C\U0000000E-\U00000021\U00000023-\U0000005B\U0000005D-\U0000D7FF\U0000E000-\U0010FFFF]'
 regexString = fr'\"({regexSCUSStringAccepted}|{regexCharEscape}|{regexStrContEscape})*\"'
 
-regexRawString = fr''
+# Regex of Raw Strings
+regexSCUSRawStringAccepted = r'[\U00000000-\U0000000C\U0000000E-\U00000021\U00000023-\U0000D7FF\U0000E000-\U0010FFFF]'
+regexSCUSRawHashedAccepted = r'[\U00000000-\U0000000C\U0000000E-\U0000D7FF\U0000E000-\U0010FFFF]'
+regexRawStringContentHashed = fr'({regexSCUSRawHashedAccepted})*?'
+
+regexRSSimple = fr'r\"(\\\"|{regexSCUSRawStringAccepted})*\"'
+regexRSHashed = fr'r(?P<hashes>\#+)"(?:{regexSCUSRawHashedAccepted})*?"(?P=hashes)(?!\#)'
+regexRawString = fr'({regexRSSimple})|({regexRSHashed})'
 
 
 # Char
@@ -222,7 +230,16 @@ def t_CHAR(t):
     return t
 
 
-# Strings
+# Raw string
+@TOKEN(regexRawString)
+def t_RAW_STRING(t):
+
+    cleanText = t.value + ""
+    t.value = str(cleanText)
+    return t
+
+
+# String
 @TOKEN(regexString)
 def t_STRING(t):
 
@@ -230,6 +247,9 @@ def t_STRING(t):
     if (str.find(t.value, "\\\U0000000A")):
         rawText = cleanText.replace("\\\U0000000A", "")
         cleanText = rawText
+    
+    if (str.find(t.value, "\U0000000A")):
+        t.lexer.lineno += t.value.count("\n")
 
     t.value = str(cleanText)
     return t
