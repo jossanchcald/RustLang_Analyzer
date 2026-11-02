@@ -2,7 +2,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from Analyzers.lexical import lexer as lexicalAnalyzer
-from Analyzers.lexical import lexicalErrors, checkUnclosedComments
+from Analyzers.lexical import lexicalErrors, checkUnclosedComments, findColumn
 
 actualRoute = Path(__file__).resolve().parent
 logFolder = actualRoute / "Logs"
@@ -30,7 +30,8 @@ def analyzeRustAlgo(rustFile, userName):
     
     tokens_procesados = ["[[[[[ TOKENS RECONOCIDOS ]]]]]"]
     for tok in lexicalAnalyzer:
-        tokens_procesados.append(f"[{tok.type}] -> {tok.value} (Línea {tok.lineno})")
+        column = findColumn(lexicalAnalyzer.lexdata, tok.lexpos)
+        tokens_procesados.append(f"[{tok.type}] -> {tok.value} (Línea {tok.lineno}, Columna {column})")
         
     checkUnclosedComments()  # Comentarios de bloque sin cerrar
 
