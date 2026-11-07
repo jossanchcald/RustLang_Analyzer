@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 from Analyzers.lexical import lexer as lexicalAnalyzer
 from Analyzers.lexical import lexicalErrors, checkUnclosedComments, findColumn
+from Analyzers.syntactic import parser, syntacticErrors
 
 actualRoute = Path(__file__).resolve().parent
 logFolder = actualRoute / "Logs"
@@ -15,16 +16,18 @@ def readFile(rustFile):
         print(f"\nError: el archivo '{rustFile}.rs' no existe. Intente nuevamente.")
         return None
 
-def createLogFile(userName, content):
+def createLogFile(userName, content, prefix="lexico"):
     now = datetime.now()
     logFolder.mkdir(parents=True, exist_ok=True)
 
-    logfName = f"lexico-{userName}-{now.strftime('%d-%m-%Y-%Hh%M')}.txt"
+    logfName = f"{prefix}-{userName}-{now.strftime('%d-%m-%Y-%Hh%M')}.txt"
     with open(logFolder / logfName, 'w', encoding='utf-8') as logFile:
         logFile.write(content)
 
 #TODO en pruebas
 def analyzeRustAlgo(rustFile, userName):
+
+    #ANALIZADOR LEXICO 
     lexicalErrors.clear()  # Limpia errores previos por si se hacen varias pruebas
     lexicalAnalyzer.input(rustFile)
     
@@ -39,8 +42,18 @@ def analyzeRustAlgo(rustFile, userName):
         tokens_procesados.append("\n [[[[[ ERRORES LÉXICOS ]]]]]")
         for err in lexicalErrors:
             tokens_procesados.append(err["mensaje"] if "mensaje" in err else str(err))
-            
+
     createLogFile(userName, "\n".join(tokens_procesados))
+
+    # ANALIZADOR SINTACTICO
+    syntacticErrors.clear()
+    lexicalAnalyzer.lineno = 1  
+    parser.parse(rustFile, lexer=lexicalAnalyzer)
+
+    erroresSintacticos = ["[[[[[ ERRORES SINTÁCTICOS ]]]]]"]
+    erroresSintacticos += syntacticErrors if syntacticErrors else ["No se encontraron errores sintácticos."]
+    createLogFile(userName, "\n".join(erroresSintacticos), prefix="sintactico")
+    
     print(f"\nAnálisis completado. Revise la carpeta 'Logs'.")
 
 def main():
@@ -64,6 +77,7 @@ def main():
         fileContent = readFile(rustfName)
 
     analyzeRustAlgo(fileContent, userNameNoBS)
+
 
 
 if __name__ == '__main__':
