@@ -14,17 +14,19 @@ def p_statement(p):
     '''statement : variable_declaration
                  | constant_declaration
                  | function_no_parameters
-                 | function_parameters'''
+                 | function_parameters
+                 | function_call SEMICOLON'''
 
 def p_variable_declaration(p):
-    '''variable_declaration : DECLARATION IDENTIFIER EQUAL value SEMICOLON
-                            | DECLARATION MUT IDENTIFIER EQUAL value SEMICOLON
-                            | DECLARATION IDENTIFIER COLON data_type SEMICOLON
-                            | DECLARATION IDENTIFIER COLON data_type EQUAL value SEMICOLON
-                            | DECLARATION MUT IDENTIFIER COLON data_type EQUAL value SEMICOLON'''
+    '''variable_declaration : DECLARATION ident EQUAL expression SEMICOLON
+                            | DECLARATION MUT ident EQUAL expression SEMICOLON
+                            | DECLARATION ident COLON data_type SEMICOLON
+                            | DECLARATION ident COLON data_type EQUAL expression SEMICOLON
+                            | DECLARATION MUT ident COLON data_type EQUAL expression SEMICOLON
+                            | DECLARATION MUT ident COLON data_type SEMICOLON'''
 
 def p_constant_declaration(p):
-    'constant_declaration : CONSTANT IDENTIFIER COLON data_type EQUAL value SEMICOLON'
+    'constant_declaration : CONSTANT ident COLON data_type EQUAL expression SEMICOLON'
 
 def p_data_type(p):
     '''data_type : TYPE_I8
@@ -59,6 +61,19 @@ def p_value(p):
             | BOOLEAN
             | BYTE_LITERAL'''
 
+# Nombres de variables, constantes y parametros
+def p_ident(p):
+    '''ident : IDENTIFIER
+             | RAW_IDENTIFIER'''
+
+def p_expression(p):
+    '''expression : value
+                  | ident
+                  | function_call'''
+
+def p_expression_cast(p):
+    'expression : expression AS data_type'
+
 # Inicio Leiner David Saltos Penafiel /////////////////////////////////////////////////////////////////////////
 
 def p_func_no_parameters(p):
@@ -73,10 +88,17 @@ def p_parameters(p):
                   | parameters COMMA parameter'''
 
 def p_parameter(p):
-    '''parameter : IDENTIFIER COLON data_type
-                 | MUT IDENTIFIER COLON data_type'''
+    '''parameter : ident COLON data_type
+                 | MUT ident COLON data_type'''
 
-# Bloque dentro de delimitadores 
+def p_function_call(p):
+    '''function_call : IDENTIFIER PARENL PARENR
+                     | IDENTIFIER PARENL arguments PARENR'''
+
+def p_arguments(p):
+    '''arguments : expression
+                 | arguments COMMA expression'''
+
 def p_block(p):
     '''block : BRACEL BRACER
              | BRACEL body BRACER'''
