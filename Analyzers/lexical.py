@@ -1,6 +1,7 @@
 import ply.lex as lex
 from ply.lex import TOKEN 
 import regex as re
+from collections import namedtuple
 
 # Lista global para almacenar los errores y posteriormente enviarlos al log
 lexicalErrors = []
@@ -173,15 +174,37 @@ t_ignore = ' \t'
 
 # Inicio parte de Josue Sanchez Calderon //////////////////////////////////////////////////////////////////////////////////////////////////
 
-def removeSufix(text, sufix_re):
-    return sufix_re.sub('', text)
+NumLiteral = namedtuple('NumLiteral', ['value', 'suffix', 'raw'])
+
+# Funciones de conversión
+def toDecimal(text):
+    return int(text, 10)
+
+def toHex(text):
+    return int(text, 16)
+
+def toBinary(text):
+    return int(text, 2)
+
+def toOctal(text):
+    return int(text, 8)
+
+def splitSufix(text, sufixRe):
+    m = sufixRe.search(text)
+    if m is None:
+        return text, None
+    return text[:m.start('suffix')], m.group('suffix')
+
+def makeNumLiteral(raw, sufixRe, convert):
+    cleanText, suffix = splitSufix(raw.replace('_', ''), sufixRe)
+    return NumLiteral(convert(cleanText), suffix, raw)
 
 regexIdChar = r'[a-zA-Z0-9_]'
 numEnd = fr'(?!{regexIdChar})'
 
 # Regex of Integers
 intSufix = r'(?:u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize)'
-compiledIntSufix = re.compile(intSufix + r'$')
+compiledIntSufix = re.compile(fr'(?P<suffix>{intSufix})$')
 
 hexDigit = r'[0-9a-fA-F]'
 regexHex = fr'0x_*{hexDigit}({hexDigit}|_)*{intSufix}?{numEnd}'
@@ -200,7 +223,7 @@ compiledBaseDigits = {'x': re.compile(r'[0-9a-fA-F_]*'),
 
 # Regex of Floating point
 floatSufix = r'(?:f32|f64)'
-compiledFloatSufix = re.compile(floatSufix + r'$')
+compiledFloatSufix = re.compile(fr'(?P<suffix>{floatSufix})$')
 
 floatExp = fr'[eE][+\-]?_*{decDigit}(?:{decDigit}|_)*'
 floatBranch1 = fr'{decDigits}(?:\.{decDigits})?{floatExp}{floatSufix}?'
@@ -557,12 +580,7 @@ def t_INVALID_STRING(t):
 # Float
 @TOKEN(regexFloat)
 def t_FLOAT(t):
-
-    rawText = t.value
-    rawTextNo_ = rawText.replace('_', '')
-    cleanText = removeSufix(rawTextNo_, compiledFloatSufix)
-    
-    t.value = float(cleanText)
+    t.value = makeNumLiteral(t.value, compiledFloatSufix, float)
     return t
 
 
@@ -570,45 +588,25 @@ def t_FLOAT(t):
 @TOKEN(regexHex)
 def t_INT_HEX(t):
     t.type = 'INTEGER'
-
-    rawText = t.value
-    rawTextNo_ = rawText.replace('_', '')
-    cleanText = removeSufix(rawTextNo_, compiledIntSufix)
-    
-    t.value = int(cleanText, base=16)
+    t.value = makeNumLiteral(t.value, compiledIntSufix, toHex)
     return t
 
 @TOKEN(regexBin)
 def t_INT_BIN(t):
     t.type = 'INTEGER'
-
-    rawText = t.value
-    rawTextNo_ = rawText.replace('_', '')
-    cleanText = removeSufix(rawTextNo_, compiledIntSufix)
-    
-    t.value = int(cleanText, base=2)
+    t.value = makeNumLiteral(t.value, compiledIntSufix, toBinary)
     return t
 
 @TOKEN(regexOct)
 def t_INT_OCT(t):
     t.type = 'INTEGER'
-
-    rawText = t.value
-    rawTextNo_ = rawText.replace('_', '')
-    cleanText = removeSufix(rawTextNo_, compiledIntSufix)
-    
-    t.value = int(cleanText, base=8)
+    t.value = makeNumLiteral(t.value, compiledIntSufix, toOctal)
     return t
 
 @TOKEN(regexDec)
 def t_INT_DEC(t):
     t.type = 'INTEGER'
-
-    rawText = t.value
-    rawTextNo_ = rawText.replace('_', '')
-    cleanText = removeSufix(rawTextNo_, compiledIntSufix)
-    
-    t.value = int(cleanText, base=10)
+    t.value = makeNumLiteral(t.value, compiledIntSufix, toDecimal)
     return t
 
 regexInvalidNumber = (r'0[xob][0-9a-zA-Z_]*|[0-9][0-9_]*(?:\.[0-9][0-9_]*)?(?:[eE][+\-]?[0-9_]*)?[0-9a-zA-Z_]*')
