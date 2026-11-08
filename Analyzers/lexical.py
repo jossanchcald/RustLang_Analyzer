@@ -31,13 +31,30 @@ reserved_words = {
     'false' : 'BOOLEAN_F'
 }
 
-# Nombres de los tipos de datos
+# Diccionario de tipos de datos
 typesNames = {
-    'i8', 'i16', 'i32', 'i64', 'i128', 'isize',
-    'u8', 'u16', 'u32', 'u64', 'u128', 'usize',
-    'f32', 'f64',
-    'bool', 'char', 'str',
-    'String', 'Vec', 'HashMap', 'Option', 'Result'
+    'i8' : 'TYPE_I8',
+    'i16' : 'TYPE_I16',
+    'i32' : 'TYPE_I32',
+    'i64' : 'TYPE_I64',
+    'i128' : 'TYPE_I128',
+    'isize' : 'TYPE_ISIZE',
+    'u8' : 'TYPE_U8',
+    'u16' : 'TYPE_U16',
+    'u32' : 'TYPE_U32',
+    'u64' : 'TYPE_U64',
+    'u128' : 'TYPE_U128',
+    'usize' : 'TYPE_USIZE',
+    'f32' : 'TYPE_F32',
+    'f64' : 'TYPE_F64',
+    'bool' : 'TYPE_BOOL',
+    'char' : 'TYPE_CHAR',
+    'str' : 'TYPE_STR',
+    'String' : 'TYPE_STRING',
+    'Vec' : 'TYPE_VEC',
+    'HashMap' : 'TYPE_HASHMAP',
+    'Option' : 'TYPE_OPTION',
+    'Result' : 'TYPE_RESULT'
 }
 
 tokens = [
@@ -94,11 +111,10 @@ tokens = [
     'PERIOD',
     'AMPERSAND',
     'PIPE',
-    'TYPE',
     'IDENTIFIER',
     'RAW_IDENTIFIER',
     'UNDERSCORE'
-] + list(reserved_words.values())
+] + list(reserved_words.values()) + list(typesNames.values())
 
 # Reglas de expresiones regulares para tokens simples
 # Operadores 
@@ -734,8 +750,8 @@ def t_IDENTIFIER(t):
     if ((t.type == 'BOOLEAN_T') | (t.type == 'BOOLEAN_F')):
         t.type = "BOOLEAN"
 
-    elif ((t.type == 'IDENTIFIER') & (t.value in typesNames)):
-        t.type = 'TYPE'
+    elif (t.type == 'IDENTIFIER'):
+        t.type = typesNames.get(t.value, 'IDENTIFIER')
 
     return t
 
