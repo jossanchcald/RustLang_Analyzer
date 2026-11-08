@@ -27,6 +27,7 @@ reserved_words = {
     'enum' : 'ENUM',
     'in' : 'IN',
     'as' : 'AS',
+    'println' : 'PRINTLN',
 
     'true': 'BOOLEAN_T',
     'false' : 'BOOLEAN_F'
