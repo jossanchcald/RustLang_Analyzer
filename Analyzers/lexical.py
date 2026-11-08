@@ -166,7 +166,7 @@ t_PIPE = r'\|'
 t_RANGE = r'(\.\.)'
 
 # Caracteres ignorados (espacios y tabulaciones)
-t_ignore = ' \t'
+t_ignore = ' \t\r'
 
 
 
@@ -174,7 +174,11 @@ t_ignore = ' \t'
 
 # Inicio parte de Josue Sanchez Calderon //////////////////////////////////////////////////////////////////////////////////////////////////
 
-NumLiteral = namedtuple('NumLiteral', ['value', 'suffix', 'raw'])
+class NumLiteral(namedtuple('NumLiteral', ['value', 'suffix', 'raw'])):
+    def __str__(self):
+        if self.suffix is None:
+            return str(self.value)
+        return f"{self.value} ({self.suffix})"
 
 # Funciones de conversión
 def toDecimal(text):
@@ -761,15 +765,9 @@ def t_newline(t):
 
 # Errores
 def t_error(t):
-
-    # Formato del error
-    error_info = {
-        "caracter": t.value[0],
-        "linea": t.lexer.lineno,
-        "posicion": t.lexpos
-    }
-    
-    lexicalErrors.append(error_info)
+    char = t.value[0]
+    addLexicalError(t.lexer.lexdata, t.lexer.lineno, t.lexpos, char,
+                    f"carácter no reconocido {char!r}")
     t.lexer.skip(1)
 
 
