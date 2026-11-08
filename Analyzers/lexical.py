@@ -366,7 +366,14 @@ def t_RAW_IDENTIFIER(t):
         return None
     return t
 
-#def t_INVALID_RAW_IDENTIFIER(t):
+# Raw identifier invalido.
+regexInvalidRawID = r'r\#(?![a-zA-Z_"\#])'
+
+@TOKEN(regexInvalidRawID)
+def t_INVALID_RAW_IDENTIFIER(t):
+    addLexicalError(t.lexer.lexdata, t.lexer.lineno, t.lexpos, t.value,
+                    "raw identifier inválido: después de 'r#' debe ir un nombre (letra o '_')")
+    return None
 
 # Fin parte de Jared Selim Beltran Martinez //////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -634,10 +641,6 @@ def t_INVALID_NUMBER(t):
 
 # Fin parte de Josue Sanchez Calderon //////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-
-
-
 # Inicio parte de Jared Beltran //////////////////////////////////////////////////////////////////////////////////////////////////
 
 # Estado exclusivo para recorrer los comentarios de bloque, ademas permite anidarlos
@@ -735,8 +738,6 @@ def t_IDENTIFIER(t):
         t.type = 'TYPE'
 
     return t
-
-
 
 # Regla para contar lineas para los mensajes de error
 def t_newline(t):
