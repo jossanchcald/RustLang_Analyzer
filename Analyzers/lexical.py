@@ -342,8 +342,8 @@ regexInvalidRawDelimiter = r'r\#{2,}(?![\"\#])(?:[^\W\d]\w*)?'
 @TOKEN(regexInvalidRawDelimiter)
 def t_INVALID_RAW_DELIMITER(t):
     addLexicalError(t.lexer.lexdata, t.lexer.lineno, t.lexpos, t.value,
-                    f"delimitador de raw string inválido '{t.value}': "
-                    "solo se permiten '#' antes de '\"'")
+                    f"delimitador de raw string inválido '{t.value}'. "
+                    "Solo se permiten '#' antes de '\"'")
     return None
 
 
@@ -372,7 +372,7 @@ regexInvalidRawID = r'r\#(?![a-zA-Z_"\#])'
 @TOKEN(regexInvalidRawID)
 def t_INVALID_RAW_IDENTIFIER(t):
     addLexicalError(t.lexer.lexdata, t.lexer.lineno, t.lexpos, t.value,
-                    "raw identifier inválido: después de 'r#' debe ir un nombre (letra o '_')")
+                    "raw identifier inválido. Después de 'r#' debe ir un nombre (letra o '_')")
     return None
 
 # Fin parte de Jared Selim Beltran Martinez //////////////////////////////////////////////////////////////////////////////////////////////////

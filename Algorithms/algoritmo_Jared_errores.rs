@@ -3,6 +3,8 @@ fn main() {
     let r#self = 1;
     let r#crate = 2;
     let valor = 3 @ 4;
+    let doble = r##abc;
+    let vacio = r#;
     /* este comentario nunca se cierra
     let oculto = 5;
 }
