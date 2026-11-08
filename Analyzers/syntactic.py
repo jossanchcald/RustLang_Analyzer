@@ -9,14 +9,15 @@ def p_program(p):
     '''program : statement
                | program statement'''
 
-
-# Aqui poner los tipos de sentencias. SI crean una nueva funcion deben de ponerla aqui 
+ 
 def p_statement(p):
     '''statement : variable_declaration
                  | constant_declaration
                  | function_no_parameters
                  | function_parameters
-                 | function_call SEMICOLON'''
+                 | function_call SEMICOLON
+                 | loop_statement
+                 | struct_definition'''
 
 # Precedencia en las operaciones - Josue Sanchez
 precedence = (
@@ -37,11 +38,11 @@ UnaryOp = namedtuple('UnaryOp', ['op', 'operand', 'line'])
 Cast = namedtuple('Cast', ['expr', 'type', 'line'])
 
 def p_variable_declaration(p):
-    '''variable_declaration : DECLARATION ident EQUAL expression SEMICOLON
-                            | DECLARATION MUT ident EQUAL expression SEMICOLON
+    '''variable_declaration : DECLARATION ident EQUAL initializer SEMICOLON
+                            | DECLARATION MUT ident EQUAL initializer SEMICOLON
                             | DECLARATION ident COLON data_type SEMICOLON
-                            | DECLARATION ident COLON data_type EQUAL expression SEMICOLON
-                            | DECLARATION MUT ident COLON data_type EQUAL expression SEMICOLON
+                            | DECLARATION ident COLON data_type EQUAL initializer SEMICOLON
+                            | DECLARATION MUT ident COLON data_type EQUAL initializer SEMICOLON
                             | DECLARATION MUT ident COLON data_type SEMICOLON'''
 
 def p_constant_declaration(p):
@@ -100,6 +101,7 @@ def p_expression_call(p):
     'expression : function_call'
     p[0] = p[1]
 
+
 # Inicio Leiner David Saltos Penafiel /////////////////////////////////////////////////////////////////////////
 
 def p_func_no_parameters(p):
@@ -132,6 +134,36 @@ def p_block(p):
 def p_body(p):
     '''body : statement
             | body statement'''
+
+def p_loop_statement(p):
+    'loop_statement : LOOP block'
+
+def p_struct_definition(p):
+    '''struct_definition : STRUCT IDENTIFIER BRACEL struct_fields BRACER
+                         | STRUCT IDENTIFIER BRACEL struct_fields COMMA BRACER'''
+
+def p_struct_fields(p):
+    '''struct_fields : struct_field
+                     | struct_fields COMMA struct_field'''
+
+def p_struct_field(p):
+    'struct_field : IDENTIFIER COLON data_type'
+
+def p_initializer(p):
+    '''initializer : expression
+                   | struct_instance'''
+
+def p_struct_instance(p):
+    'struct_instance : IDENTIFIER BRACEL field_values BRACER'
+
+def p_field_values(p):
+    '''field_values : field_value
+                    | field_values COMMA field_value'''
+
+def p_field_value(p):
+    'field_value : IDENTIFIER COLON expression'
+
+# Fin parte de Leiner David Saltos Penafiel ///////////////////////////////////////////////////////////////////////////
 
 # Inicio parte de Josue Sanchez Calderon /////////////////////////////////////////////////////////////////////////
 
