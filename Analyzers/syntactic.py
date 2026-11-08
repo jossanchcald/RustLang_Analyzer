@@ -17,7 +17,9 @@ def p_statement(p):
                  | function_parameters
                  | function_call SEMICOLON
                  | loop_statement
-                 | struct_definition'''
+                 | struct_definition
+                 | enum_definition
+                 | print_statement'''
 
 # Precedencia en las operaciones - Josue Sanchez
 precedence = (
@@ -162,6 +164,18 @@ def p_field_values(p):
 
 def p_field_value(p):
     'field_value : IDENTIFIER COLON expression'
+
+def p_enum_definition(p):
+    '''enum_definition : ENUM IDENTIFIER BRACEL enum_variants BRACER
+                       | ENUM IDENTIFIER BRACEL enum_variants COMMA BRACER'''
+
+def p_enum_variants(p):
+    '''enum_variants : IDENTIFIER
+                     | enum_variants COMMA IDENTIFIER'''
+
+def p_print_statement(p):
+    '''print_statement : PRINTLN NOT PARENL STRING PARENR SEMICOLON
+                       | PRINTLN NOT PARENL STRING COMMA arguments PARENR SEMICOLON'''
 
 # Fin parte de Leiner David Saltos Penafiel ///////////////////////////////////////////////////////////////////////////
 
