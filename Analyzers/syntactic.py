@@ -17,12 +17,36 @@ def p_statement(p):
 def p_variable_declaration(p):
     '''variable_declaration : DECLARATION IDENTIFIER EQUAL value SEMICOLON
                             | DECLARATION MUT IDENTIFIER EQUAL value SEMICOLON
-                            | DECLARATION IDENTIFIER COLON TYPE SEMICOLON
-                            | DECLARATION IDENTIFIER COLON TYPE EQUAL value SEMICOLON
-                            | DECLARATION MUT IDENTIFIER COLON TYPE EQUAL value SEMICOLON'''
+                            | DECLARATION IDENTIFIER COLON data_type SEMICOLON
+                            | DECLARATION IDENTIFIER COLON data_type EQUAL value SEMICOLON
+                            | DECLARATION MUT IDENTIFIER COLON data_type EQUAL value SEMICOLON'''
 
 def p_constant_declaration(p):
-    'constant_declaration : CONSTANT IDENTIFIER COLON TYPE EQUAL value SEMICOLON'
+    'constant_declaration : CONSTANT IDENTIFIER COLON data_type EQUAL value SEMICOLON'
+
+def p_data_type(p):
+    '''data_type : TYPE_I8
+                 | TYPE_I16
+                 | TYPE_I32
+                 | TYPE_I64
+                 | TYPE_I128
+                 | TYPE_ISIZE
+                 | TYPE_U8
+                 | TYPE_U16
+                 | TYPE_U32
+                 | TYPE_U64
+                 | TYPE_U128
+                 | TYPE_USIZE
+                 | TYPE_F32
+                 | TYPE_F64
+                 | TYPE_BOOL
+                 | TYPE_CHAR
+                 | TYPE_STR
+                 | TYPE_STRING
+                 | TYPE_VEC
+                 | TYPE_HASHMAP
+                 | TYPE_OPTION
+                 | TYPE_RESULT'''
 
 def p_value(p):
     '''value : INTEGER
@@ -32,6 +56,8 @@ def p_value(p):
             | RAW_STRING
             | BOOLEAN
             | BYTE_LITERAL'''
+
+# Inicio
 
 # Error rule for syntax errors
 def p_error(p):
