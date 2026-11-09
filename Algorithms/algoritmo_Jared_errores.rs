@@ -5,6 +5,9 @@ fn main() {
     let valor = 3 @ 4;
     let doble = r##abc;
     let vacio = r#;
+    let numero = r#9;
+    let guion = r#_;
+    let raw = r#match;
     /* este comentario nunca se cierra
     let oculto = 5;
 }
