@@ -19,7 +19,8 @@ def p_statement(p):
                  | loop_statement
                  | struct_definition
                  | enum_definition
-                 | print_statement'''
+                 | print_statement
+                 | input_statement'''
 
 # Precedencia en las operaciones - Josue Sanchez
 precedence = (
@@ -176,6 +177,20 @@ def p_enum_variants(p):
 def p_print_statement(p):
     '''print_statement : PRINTLN NOT PARENL STRING PARENR SEMICOLON
                        | PRINTLN NOT PARENL STRING COMMA arguments PARENR SEMICOLON'''
+
+def p_expression_string_new(p):
+    'expression : TYPE_STRING DOUBLE_COLON IDENTIFIER PARENL PARENR'
+    if p[3] != 'new':
+        column = findColumn(p.lexer.lexdata, p.lexpos(3))
+        syntacticErrors.append(f"Error de sintaxis en token [IDENTIFIER] -> {p[3]} (Línea {p.lineno(3)}, Columna {column})")
+
+def p_input_statement(p):
+    'input_statement : IDENTIFIER DOUBLE_COLON IDENTIFIER DOUBLE_COLON IDENTIFIER PARENL PARENR PERIOD IDENTIFIER PARENL AMPERSAND MUT ident PARENR PERIOD IDENTIFIER PARENL STRING PARENR SEMICOLON'
+    for position, name in ((1, 'std'), (3, 'io'), (5, 'stdin'), (9, 'read_line'), (16, 'expect')):
+        if p[position] != name:
+            column = findColumn(p.lexer.lexdata, p.lexpos(position))
+            syntacticErrors.append(f"Error de sintaxis en token [IDENTIFIER] -> {p[position]} (Línea {p.lineno(position)}, Columna {column})")
+            break
 
 # Fin parte de Leiner David Saltos Penafiel ///////////////////////////////////////////////////////////////////////////
 
