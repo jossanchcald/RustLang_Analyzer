@@ -75,6 +75,10 @@ def p_data_type(p):
                  | TYPE_OPTION
                  | TYPE_RESULT'''
 
+def p_data_type_referencia(p):
+    '''data_type : AMPERSAND data_type
+                 | AMPERSAND MUT data_type'''
+
 def p_value(p):
     '''value : INTEGER
              | FLOAT
@@ -113,7 +117,6 @@ def p_func_no_parameters(p):
 def p_func_parameters(p):
     'function_parameters : FUNCTION IDENTIFIER PARENL parameters PARENR block'
 
-# Uno o mas parametros separados por coma
 def p_parameters(p):
     '''parameters : parameter
                   | parameters COMMA parameter'''
@@ -183,6 +186,14 @@ def p_expression_string_new(p):
     if p[3] != 'new':
         column = findColumn(p.lexer.lexdata, p.lexpos(3))
         syntacticErrors.append(f"Error de sintaxis en token [IDENTIFIER] -> {p[3]} (Línea {p.lineno(3)}, Columna {column})")
+
+def p_expression_reference(p):
+    'expression : AMPERSAND expression %prec UMINUS'
+    p[0] = UnaryOp(p[1], p[2], p.lineno(1))
+
+def p_expression_mutable_reference(p):
+    'expression : AMPERSAND MUT expression %prec UMINUS'
+    p[0] = UnaryOp('&mut', p[3], p.lineno(1))
 
 def p_input_statement(p):
     'input_statement : IDENTIFIER DOUBLE_COLON IDENTIFIER DOUBLE_COLON IDENTIFIER PARENL PARENR PERIOD IDENTIFIER PARENL AMPERSAND MUT ident PARENR PERIOD IDENTIFIER PARENL STRING PARENR SEMICOLON'
