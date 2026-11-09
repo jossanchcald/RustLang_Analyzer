@@ -9,7 +9,7 @@ def p_program(p):
     '''program : statement
                | program statement'''
 
- 
+# Las alternativas 'error SEMICOLON' y 'error block' (Jared) recuperan el analisis tras una sentencia invalida
 def p_statement(p):
     '''statement : variable_declaration
                  | constant_declaration
@@ -22,7 +22,12 @@ def p_statement(p):
                  | print_statement
                  | input_statement
                  | assignment
-                 | if_statement'''
+                 | if_statement
+                 | while_statement
+                 | break_statement
+                 | continue_statement
+                 | error SEMICOLON
+                 | error block'''
 
 # Precedencia en las operaciones - Josue Sanchez
 precedence = (
@@ -274,6 +279,22 @@ def p_if_statement(p):
 def p_if_error(p):
     'if_statement : IF error block'
     addSyntacticError(p, 1, "'if' mal formado: se esperaba una condición seguida de un bloque entre llaves")
+
+# 3. Bucle while, break y continue
+def p_while_statement(p):
+    'while_statement : WHILE expression block'
+
+def p_while_error(p):
+    'while_statement : WHILE error block'
+    addSyntacticError(p, 1, "'while' mal formado: se esperaba una condición seguida de un bloque entre llaves")
+
+# break puede llevar un valor (para loop): break; o break 5;
+def p_break_statement(p):
+    '''break_statement : BREAK SEMICOLON
+                       | BREAK expression SEMICOLON'''
+
+def p_continue_statement(p):
+    'continue_statement : CONTINUE SEMICOLON'
 
 # Fin parte de Jared Selim Beltran Martinez ///////////////////////////////////////////////////////////////
 
