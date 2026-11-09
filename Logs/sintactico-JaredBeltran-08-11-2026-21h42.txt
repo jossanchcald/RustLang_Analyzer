@@ -1,0 +1,10 @@
+[[[[[ ERRORES SINTÁCTICOS ]]]]]
+Error de sintaxis en token [BRACEL] -> { (Línea 8, Columna 8)
+Error sintáctico (línea 8, columna 5): 'if' mal formado: se esperaba una condición seguida de un bloque entre llaves
+Error de sintaxis en token [BRACEL] -> { (Línea 13, Columna 11)
+Error sintáctico (línea 13, columna 5): 'while' mal formado: se esperaba una condición seguida de un bloque entre llaves
+Error de sintaxis en token [SEMICOLON] -> ; (Línea 18, Columna 16)
+Error de sintaxis en token [LESS_THAN] -> < (Línea 23, Columna 21)
+Error sintáctico (línea 23, columna 5): 'if' mal formado: se esperaba una condición seguida de un bloque entre llaves
+Error de sintaxis en token [INTEGER] -> 3 (Línea 28, Columna 35)
+Error de sintaxis en token [ELSE] -> else (Línea 33, Columna 5)
