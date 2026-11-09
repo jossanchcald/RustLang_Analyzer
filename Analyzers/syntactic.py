@@ -20,7 +20,8 @@ def p_statement(p):
                  | struct_definition
                  | enum_definition
                  | print_statement
-                 | input_statement'''
+                 | input_statement
+                 | assignment'''
 
 # Precedencia en las operaciones - Josue Sanchez
 precedence = (
@@ -246,6 +247,15 @@ def p_expression_group(p):
     p[0] = p[2]
 
 # Fin parte de Josue Sanchez Calderon /////////////////////////////////////////////////////////////////////////
+
+# Inicio parte de Jared Selim Beltran Martinez /////////////////////////////////////////////////////////
+
+# 1. Asignacion posterior a una variable
+# Ejemplo: total = 50;
+def p_assignment(p):
+    'assignment : ident EQUAL expression SEMICOLON'
+
+# Fin parte de Jared Selim Beltran Martinez ///////////////////////////////////////////////////////////////
 
 # Error rule for syntax errors
 def p_error(p):
