@@ -21,7 +21,8 @@ def p_statement(p):
                  | enum_definition
                  | print_statement
                  | input_statement
-                 | assignment'''
+                 | assignment
+                 | if_statement'''
 
 # Precedencia en las operaciones - Josue Sanchez
 precedence = (
@@ -250,10 +251,29 @@ def p_expression_group(p):
 
 # Inicio parte de Jared Selim Beltran Martinez /////////////////////////////////////////////////////////
 
-# 1. Asignacion posterior a una variable
+# Guarda un error sintactico propio con la linea y la columna del token numero 'index' de la regla
+def addSyntacticError(p, index, message):
+    line = p.lineno(index)
+    column = findColumn(p.lexer.lexdata, p.lexpos(index))
+    syntacticErrors.append(f"Error sintáctico (línea {line}, columna {column}): {message}")
+
+# 1. Asignacion simple
 # Ejemplo: total = 50;
 def p_assignment(p):
     'assignment : ident EQUAL expression SEMICOLON'
+
+# 2. Condicionales
+# La condicion es una 'expression'
+# 'else if' es un else seguido de otro if_statement
+def p_if_statement(p):
+    '''if_statement : IF expression block
+                    | IF expression block ELSE block
+                    | IF expression block ELSE if_statement'''
+
+# Cuando falla la condicion o faltan las llaves, aqui PLY descarta tokens hasta la '{' y sigue desde ahi para que pueda avanzar
+def p_if_error(p):
+    'if_statement : IF error block'
+    addSyntacticError(p, 1, "'if' mal formado: se esperaba una condición seguida de un bloque entre llaves")
 
 # Fin parte de Jared Selim Beltran Martinez ///////////////////////////////////////////////////////////////
 
