@@ -296,6 +296,31 @@ def p_break_statement(p):
 def p_continue_statement(p):
     'continue_statement : CONTINUE SEMICOLON'
 
+# 4. Arreglos y Tuplas
+def p_array_literal(p):
+    '''array_literal : BRACKL BRACKR
+                     | BRACKL expression_list BRACKR
+                     | BRACKL expression_list COMMA BRACKR
+                     | BRACKL expression SEMICOLON expression BRACKR'''
+
+# Tupla: (), (1,), ("Carlos", 20, 1.75)
+def p_tuple_literal(p):
+    '''tuple_literal : PARENL PARENR
+                     | PARENL expression COMMA PARENR
+                     | PARENL expression COMMA expression_list PARENR
+                     | PARENL expression COMMA expression_list COMMA PARENR'''
+
+# Lista de expresiones separadas por coma
+def p_expression_list(p):
+    '''expression_list : expression
+                       | expression_list COMMA expression'''
+
+# Arreglos y tuplas se pueden usar como cualquier expresion (por ejemplo, un arreglo dentro de otro)
+def p_expression_estructuras(p):
+    '''expression : array_literal
+                  | tuple_literal'''
+    p[0] = p[1]
+
 # Fin parte de Jared Selim Beltran Martinez ///////////////////////////////////////////////////////////////
 
 # Error rule for syntax errors
