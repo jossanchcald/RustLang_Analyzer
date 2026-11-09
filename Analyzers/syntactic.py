@@ -26,6 +26,8 @@ def p_statement(p):
                  | while_statement
                  | break_statement
                  | continue_statement
+                 | return_statement
+                 | function_return
                  | error SEMICOLON
                  | error block'''
 
@@ -320,6 +322,24 @@ def p_expression_estructuras(p):
     '''expression : array_literal
                   | tuple_literal'''
     p[0] = p[1]
+
+# 5. Funciones con retorno
+# fn sumar(a: i32, b: i32) -> i32 { return a + b; }
+def p_function_return(p):
+    '''function_return : FUNCTION IDENTIFIER PARENL PARENR ARROW data_type return_block
+                       | FUNCTION IDENTIFIER PARENL parameters PARENR ARROW data_type return_block'''
+
+# Cuerpo de la funcion: admite una expresion final sin punto y coma, que es el valor devuelto
+def p_return_block(p):
+    '''return_block : BRACEL BRACER
+                    | BRACEL body BRACER
+                    | BRACEL expression BRACER
+                    | BRACEL body expression BRACER'''
+
+# return; o return expresion;
+def p_return_statement(p):
+    '''return_statement : RETURN SEMICOLON
+                        | RETURN expression SEMICOLON'''
 
 # Fin parte de Jared Selim Beltran Martinez ///////////////////////////////////////////////////////////////
 
