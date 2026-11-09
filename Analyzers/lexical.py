@@ -67,6 +67,8 @@ tokens = [
     'RAW_STRING',
     'BOOLEAN',
     'BYTE_LITERAL',
+    'RANGE_INCLUSIVE',
+    'VEC_MACRO',
     
     # Operadores
     'PLUS',
@@ -657,6 +659,16 @@ def t_INVALID_NUMBER(t):
 
     addLexicalError(t.lexer.lexdata, t.lexer.lineno, t.lexpos, val, msg)
     return None
+
+
+@TOKEN(r'\.\.=')
+def t_RANGE_INCLUSIVE(t):
+    return t
+
+
+@TOKEN(r'vec!(?=\s*\[)')
+def t_VEC_MACRO(t):
+    return t
 
 # Fin parte de Josue Sanchez Calderon //////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -29,10 +29,13 @@ def p_statement(p):
                  | return_statement
                  | function_return
                  | error SEMICOLON
-                 | error block'''
+                 | error block
+                 | for_statement
+                 | method_call SEMICOLON'''
 
 # Precedencia en las operaciones - Josue Sanchez
 precedence = (
+    ('nonassoc', 'CLOSURE'), # el cuerpo de un closure abarca toda la expresión que sigue
     ('left', 'OR'),
     ('left', 'AND'),
     ('nonassoc', 'EQUAL_TO', 'NOT_EQUAL_TO', 'LESS_THAN', 'GREATER_THAN', 'LESS_EQUAL_THAN', 'GREATER_EQUAL_THAN'), # Para que no sea valido a < b < c y asi
@@ -40,14 +43,8 @@ precedence = (
     ('left', 'MULT', 'DIV', 'MOD'),
     ('left', 'AS'),
     ('right', 'UMINUS', 'UNOT'), # tokens ficticios, para %prec
+    ('left', 'PERIOD'), # llamada a método, es más importante (-a.abs() es -(a.abs()))
 )
-
-# Nodos
-Literal = namedtuple('Literal', ['kind', 'value', 'line'])
-Var = namedtuple('Var', ['name', 'line'])
-BinOp = namedtuple('BinOp', ['op', 'left', 'right', 'line'])
-UnaryOp = namedtuple('UnaryOp', ['op', 'operand', 'line'])
-Cast = namedtuple('Cast', ['expr', 'type', 'line'])
 
 def p_variable_declaration(p):
     '''variable_declaration : DECLARATION ident EQUAL initializer SEMICOLON
@@ -96,14 +93,13 @@ def p_value(p):
              | RAW_STRING
              | BOOLEAN
              | BYTE_LITERAL'''
-    p[0] = Literal(p.slice[1].type, p[1], p.lineno(1))
 
 # Nombres de variables, constantes y parametros
 def p_ident(p):
     '''ident : IDENTIFIER
              | RAW_IDENTIFIER'''
     p[0] = p[1]
-    p.set_lineno(0, p.lineno(1)) # el no terminal 'ident' conserva la línea del token
+    #p.set_lineno(0, p.lineno(1)) # el no terminal 'ident' conserva la línea del token, útil para los nodos
 
 def p_expression_value(p):
     'expression : value'
@@ -111,7 +107,6 @@ def p_expression_value(p):
 
 def p_expression_ident(p):
     'expression : ident'
-    p[0] = Var(p[1], p.lineno(1))
 
 def p_expression_call(p):
     'expression : function_call'
@@ -198,11 +193,9 @@ def p_expression_string_new(p):
 
 def p_expression_reference(p):
     'expression : AMPERSAND expression %prec UMINUS'
-    p[0] = UnaryOp(p[1], p[2], p.lineno(1))
 
 def p_expression_mutable_reference(p):
     'expression : AMPERSAND MUT expression %prec UMINUS'
-    p[0] = UnaryOp('&mut', p[3], p.lineno(1))
 
 def p_input_statement(p):
     'input_statement : IDENTIFIER DOUBLE_COLON IDENTIFIER DOUBLE_COLON IDENTIFIER PARENL PARENR PERIOD IDENTIFIER PARENL AMPERSAND MUT ident PARENR PERIOD IDENTIFIER PARENL STRING PARENR SEMICOLON'
@@ -214,6 +207,9 @@ def p_input_statement(p):
 
 # Fin parte de Leiner David Saltos Penafiel ///////////////////////////////////////////////////////////////////////////
 
+
+
+
 # Inicio parte de Josue Sanchez Calderon /////////////////////////////////////////////////////////////////////////
 
 def p_expression_arithmetic(p):
@@ -222,7 +218,6 @@ def p_expression_arithmetic(p):
                   | expression MULT expression
                   | expression DIV expression
                   | expression MOD expression'''
-    p[0] = BinOp(p[2], p[1], p[3], p.lineno(2))
 
 def p_expression_comparison(p):
     '''expression : expression EQUAL_TO expression
@@ -231,30 +226,90 @@ def p_expression_comparison(p):
                   | expression GREATER_THAN expression
                   | expression LESS_EQUAL_THAN expression
                   | expression GREATER_EQUAL_THAN expression'''
-    p[0] = BinOp(p[2], p[1], p[3], p.lineno(2))
 
 def p_expression_logical(p):
     '''expression : expression AND expression
                   | expression OR expression'''
-    p[0] = BinOp(p[2], p[1], p[3], p.lineno(2))
 
 def p_expression_unary_minus(p):
     'expression : MINUS expression %prec UMINUS'
-    p[0] = UnaryOp(p[1], p[2], p.lineno(1))
 
 def p_expression_not(p):
     'expression : NOT expression %prec UNOT'
-    p[0] = UnaryOp(p[1], p[2], p.lineno(1))
 
 def p_expression_cast(p):
     'expression : expression AS data_type'
-    p[0] = Cast(p[1], p[3], p.lineno(2))
 
 def p_expression_group(p):
     'expression : PARENL expression PARENR'
     p[0] = p[2]
 
+# += -= *=
+def p_assignment_compound(p):
+    '''assignment : ident PLUS_EQUAL expression SEMICOLON
+                  | ident MINUS_EQUAL expression SEMICOLON
+                  | ident TIMES_EQUAL expression SEMICOLON
+                  | ident DIV_EQUAL expression SEMICOLON
+                  | ident MOD_EQUAL expression SEMICOLON'''
+
+# for con rango o coleccion
+def p_for_statement(p):
+    'for_statement : FOR for_variable IN for_iterable block'
+
+def p_for_error(p):
+    'for_statement : FOR error block'
+    addSyntacticError(p, 1, "'for' mal formado: se esperaba 'for variable in rango_o_colección { ... }'")
+
+# Un for puede ser, for x in y puede ser for _ in
+def p_for_variable(p):
+    '''for_variable : ident
+                    | UNDERSCORE'''
+
+# Un rango (a..b) o cualquier expresión que sea una colección
+def p_for_iterable(p):
+    '''for_iterable : expression
+                    | expression RANGE expression
+                    | expression RANGE_INCLUSIVE expression'''
+
+# Llamadas a métodos v.iter(), x.to_string(), v.push(1)
+def p_method_call(p):
+    '''method_call : expression PERIOD IDENTIFIER PARENL PARENR
+                   | expression PERIOD IDENTIFIER PARENL arguments PARENR'''
+
+def p_expression_method(p):
+    'expression : method_call'
+
+# vec![1, 2, 3], vec![0; 10], vec![]
+def p_expression_vec(p):
+    'expression : VEC_MACRO array_literal'
+
+# String::from("...")
+def p_expression_string_from(p):
+    'expression : TYPE_STRING DOUBLE_COLON IDENTIFIER PARENL expression PARENR'
+    if p[3] != 'from':
+        addSyntacticError(p, 3, f"se esperaba 'from' después de 'String::', se encontró '{p[3]}'")
+
+# Closures: |a, b| a + b   |x: i32| -> i32 { x + 1 }
+def p_expression_closure(p):
+    '''expression : PIPE closure_params PIPE expression %prec CLOSURE
+                  | PIPE closure_params PIPE return_block
+                  | PIPE closure_params PIPE ARROW data_type return_block
+                  | OR expression %prec CLOSURE
+                  | OR return_block
+                  | OR ARROW data_type return_block'''
+
+def p_closure_params(p):
+    '''closure_params : closure_param
+                      | closure_params COMMA closure_param'''
+
+def p_closure_param(p):
+    '''closure_param : ident
+                     | ident COLON data_type'''
+
 # Fin parte de Josue Sanchez Calderon /////////////////////////////////////////////////////////////////////////
+
+
+
 
 # Inicio parte de Jared Selim Beltran Martinez /////////////////////////////////////////////////////////
 
