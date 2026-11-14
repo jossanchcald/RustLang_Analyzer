@@ -218,3 +218,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Ignorar los documentos del parser
+Analyzers/parsetab.py
+Analyzers/parser.out

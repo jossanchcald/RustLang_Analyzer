@@ -4,6 +4,7 @@ from pathlib import Path
 from Analyzers.lexical import lexer as lexicalAnalyzer
 from Analyzers.lexical import lexicalErrors, checkUnclosedComments, findColumn
 from Analyzers.syntactic import parser, syntacticErrors
+from Analyzers.semantic import reiniciarSemantica, listaErroresSemanticos
 
 actualRoute = Path(__file__).resolve().parent
 logFolder = actualRoute / "Logs"
@@ -16,11 +17,11 @@ def readFile(rustFile):
         print(f"\nError: el archivo '{rustFile}.rs' no existe. Intente nuevamente.")
         return None
 
-def createLogFile(userName, content, prefix="lexico"):
+def createLogFile(userName, content, prefix="lexico", dateFormat='%d-%m-%Y-%Hh%M'):
     now = datetime.now()
     logFolder.mkdir(parents=True, exist_ok=True)
 
-    logfName = f"{prefix}-{userName}-{now.strftime('%d-%m-%Y-%Hh%M')}.txt"
+    logfName = f"{prefix}-{userName}-{now.strftime(dateFormat)}.txt"
     with open(logFolder / logfName, 'w', encoding='utf-8') as logFile:
         logFile.write(content)
 
@@ -47,12 +48,18 @@ def analyzeRustAlgo(rustFile, userName):
 
     # ANALIZADOR SINTACTICO
     syntacticErrors.clear()
-    lexicalAnalyzer.lineno = 1  
-    parser.parse(rustFile, lexer=lexicalAnalyzer)
+
+    reiniciarSemantica()  # el analisis semantico ocurre mientras el parser reconoce las reglas, por lo tanto se limpian la tabla de simbolos y los errores antes de empezar
+    lexicalAnalyzer.lineno = 1
+    parser.parse(rustFile, lexer=lexicalAnalyzer, tracking=True)
 
     erroresSintacticos = ["[[[[[ ERRORES SINTÁCTICOS ]]]]]"]
     erroresSintacticos += syntacticErrors if syntacticErrors else ["No se encontraron errores sintácticos."]
     createLogFile(userName, "\n".join(erroresSintacticos), prefix="sintactico")
+
+    erroresSemanticos = ["[[[[[ ERRORES SEMÁNTICOS ]]]]]"]
+    erroresSemanticos += listaErroresSemanticos() or ["No se encontraron errores semánticos."]
+    createLogFile(userName, "\n".join(erroresSemanticos), prefix="semantico", dateFormat='%d%m%Y-%Hh%M')
     
     print(f"\nAnálisis completado. Revise la carpeta 'Logs'.")
 

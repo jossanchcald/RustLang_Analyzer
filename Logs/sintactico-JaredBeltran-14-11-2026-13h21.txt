@@ -1,0 +1,4 @@
+[[[[[ ERRORES SINTÁCTICOS ]]]]]
+Error de sintaxis en token [RETURN] -> return (Línea 1, Columna 21)
+Error de sintaxis en token [SEMICOLON] -> ; (Línea 13, Columna 10)
+Error de sintaxis en token [ELSE] -> else (Línea 58, Columna 1)
