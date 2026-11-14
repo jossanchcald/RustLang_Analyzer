@@ -1,6 +1,7 @@
 import ply.yacc as yacc
 from Analyzers.lexical import tokens, findColumn
 from collections import namedtuple
+from Analyzers.semantic import *
 
 syntacticErrors = []
 
@@ -53,9 +54,21 @@ def p_variable_declaration(p):
                             | DECLARATION ident COLON data_type EQUAL initializer SEMICOLON
                             | DECLARATION MUT ident COLON data_type EQUAL initializer SEMICOLON
                             | DECLARATION MUT ident COLON data_type SEMICOLON'''
+    # Semantico (Jared). Aqui guarda el tipo de la variable en la tabla (el declarado, o el del valor inicial)
+    nombre = tipoDeclarado = tipoValor = None
+    for i in range(1, len(p)):
+        simbolo = p.slice[i].type
+        if simbolo == 'ident':
+            nombre = p[i]
+        elif simbolo == 'data_type':
+            tipoDeclarado = p[i]
+        elif simbolo == 'initializer':
+            tipoValor = p[i]
+    tabla_simbolos["variables"][nombre] = tipoDeclarado if tipoDeclarado is not None else tipoValor
 
 def p_constant_declaration(p):
     'constant_declaration : CONSTANT ident COLON data_type EQUAL expression SEMICOLON'
+    tabla_simbolos["constantes"][p[2]] = p[4]  # Semantico (Jared): tipo de la constante
 
 def p_data_type(p):
     '''data_type : TYPE_I8
@@ -80,10 +93,12 @@ def p_data_type(p):
                  | TYPE_HASHMAP
                  | TYPE_OPTION
                  | TYPE_RESULT'''
+    p[0] = p[1]  # Semantico (Jared). Aqui el tipo escrito en el codigo ('i32', 'bool'...) sube por p[0]
 
 def p_data_type_referencia(p):
     '''data_type : AMPERSAND data_type
                  | AMPERSAND MUT data_type'''
+    p[0] = p[len(p) - 1]  # Semantico (Jared). Aqui una referencia tiene el tipo de lo referenciado
 
 def p_value(p):
     '''value : INTEGER
@@ -93,6 +108,7 @@ def p_value(p):
              | RAW_STRING
              | BOOLEAN
              | BYTE_LITERAL'''
+    p[0] = tipoLiteral(p.slice[1].type, p[1])  # Semantico (Jared). Aqui el tipo del literal sube por p[0]
 
 # Nombres de variables, constantes y parametros
 def p_ident(p):
@@ -107,6 +123,7 @@ def p_expression_value(p):
 
 def p_expression_ident(p):
     'expression : ident'
+    p[0] = buscarVariable(p[1])  # Semantico (Jared). Aqui el tipo de la variable segun la tabla de simbolos
 
 def p_expression_call(p):
     'expression : function_call'
@@ -128,10 +145,13 @@ def p_parameters(p):
 def p_parameter(p):
     '''parameter : ident COLON data_type
                  | MUT ident COLON data_type'''
+    # Semantico (Jared): el parametro entra a la tabla de simbolos con su tipo
+    tabla_simbolos["variables"][p[len(p) - 3]] = p[len(p) - 1]
 
 def p_function_call(p):
     '''function_call : IDENTIFIER PARENL PARENR
                      | IDENTIFIER PARENL arguments PARENR'''
+    p[0] = tabla_simbolos["funciones"].get(p[1])  # Semantico (Jared): tipo que devuelve la funcion
 
 def p_arguments(p):
     '''arguments : expression
@@ -162,6 +182,7 @@ def p_struct_field(p):
 def p_initializer(p):
     '''initializer : expression
                    | struct_instance'''
+    p[0] = p[1]  # Semantico (Jared). Aqui el tipo del valor inicial sube
 
 def p_struct_instance(p):
     'struct_instance : IDENTIFIER BRACEL field_values BRACER'
@@ -190,12 +211,15 @@ def p_expression_string_new(p):
     if p[3] != 'new':
         column = findColumn(p.lexer.lexdata, p.lexpos(3))
         syntacticErrors.append(f"Error de sintaxis en token [IDENTIFIER] -> {p[3]} (Línea {p.lineno(3)}, Columna {column})")
+    p[0] = 'String'  # Semantico (Jared)
 
 def p_expression_reference(p):
     'expression : AMPERSAND expression %prec UMINUS'
+    p[0] = p[2]  # Semantico (Jared)
 
 def p_expression_mutable_reference(p):
     'expression : AMPERSAND MUT expression %prec UMINUS'
+    p[0] = p[3]  # Semantico (Jared)
 
 def p_input_statement(p):
     'input_statement : IDENTIFIER DOUBLE_COLON IDENTIFIER DOUBLE_COLON IDENTIFIER PARENL PARENR PERIOD IDENTIFIER PARENL AMPERSAND MUT ident PARENR PERIOD IDENTIFIER PARENL STRING PARENR SEMICOLON'
@@ -207,9 +231,6 @@ def p_input_statement(p):
 
 # Fin parte de Leiner David Saltos Penafiel ///////////////////////////////////////////////////////////////////////////
 
-
-
-
 # Inicio parte de Josue Sanchez Calderon /////////////////////////////////////////////////////////////////////////
 
 def p_expression_arithmetic(p):
@@ -218,6 +239,7 @@ def p_expression_arithmetic(p):
                   | expression MULT expression
                   | expression DIV expression
                   | expression MOD expression'''
+    p[0] = aritmetica(p[1], p[3])  # Semantico (Jared). Aqui el tipo del resultado
 
 def p_expression_comparison(p):
     '''expression : expression EQUAL_TO expression
@@ -226,19 +248,24 @@ def p_expression_comparison(p):
                   | expression GREATER_THAN expression
                   | expression LESS_EQUAL_THAN expression
                   | expression GREATER_EQUAL_THAN expression'''
+    p[0] = 'bool'  # Semantico (Jared)
 
 def p_expression_logical(p):
     '''expression : expression AND expression
                   | expression OR expression'''
+    p[0] = 'bool'  # Semantico (Jared)
 
 def p_expression_unary_minus(p):
     'expression : MINUS expression %prec UMINUS'
+    p[0] = p[2]  # Semantico (Jared)
 
 def p_expression_not(p):
     'expression : NOT expression %prec UNOT'
+    p[0] = p[2] if claseDeTipo(p[2]) == 'entero' else 'bool'  # Semantico (Jared)
 
 def p_expression_cast(p):
     'expression : expression AS data_type'
+    p[0] = p[3]  # Semantico (Jared). Aqui el resultado tiene el tipo al que se convierte
 
 def p_expression_group(p):
     'expression : PARENL expression PARENR'
@@ -264,6 +291,8 @@ def p_for_error(p):
 def p_for_variable(p):
     '''for_variable : ident
                     | UNDERSCORE'''
+    if p.slice[1].type == 'ident':
+        tabla_simbolos["variables"][p[1]] = None  # Semantico (Jared). Aqui la variable del for existe, su tipo no se conoce
 
 # Un rango (a..b) o cualquier expresión que sea una colección
 def p_for_iterable(p):
@@ -275,19 +304,23 @@ def p_for_iterable(p):
 def p_method_call(p):
     '''method_call : expression PERIOD IDENTIFIER PARENL PARENR
                    | expression PERIOD IDENTIFIER PARENL arguments PARENR'''
+    p[0] = METODOS_CONOCIDOS.get(p[3])  # Semantico (Jared). Aqui solo se conoce el tipo de algunos metodos (len, to_string)
 
 def p_expression_method(p):
     'expression : method_call'
+    p[0] = p[1]
 
 # vec![1, 2, 3], vec![0; 10], vec![]
 def p_expression_vec(p):
     'expression : VEC_MACRO array_literal'
+    p[0] = 'Vec'  # Semantico (Jared)
 
 # String::from("...")
 def p_expression_string_from(p):
     'expression : TYPE_STRING DOUBLE_COLON IDENTIFIER PARENL expression PARENR'
     if p[3] != 'from':
         addSyntacticError(p, 3, f"se esperaba 'from' después de 'String::', se encontró '{p[3]}'")
+    p[0] = 'String'  # Semantico (Jared)
 
 # Closures: |a, b| a + b   |x: i32| -> i32 { x + 1 }
 def p_expression_closure(p):
@@ -307,9 +340,6 @@ def p_closure_param(p):
                      | ident COLON data_type'''
 
 # Fin parte de Josue Sanchez Calderon /////////////////////////////////////////////////////////////////////////
-
-
-
 
 # Inicio parte de Jared Selim Beltran Martinez /////////////////////////////////////////////////////////
 
@@ -359,6 +389,12 @@ def p_array_literal(p):
                      | BRACKL expression_list BRACKR
                      | BRACKL expression_list COMMA BRACKR
                      | BRACKL expression SEMICOLON expression BRACKR'''
+    if len(p) == 3:
+        p[0] = ('array', None, None)
+    elif len(p) == 6:
+        p[0] = ('array', p[2], None)   # [valor; cantidad]
+    else:
+        p[0] = tipoArreglo(p[2], p.lineno(1))
 
 # Tupla: (), (1,), ("Carlos", 20, 1.75)
 def p_tuple_literal(p):
@@ -366,11 +402,13 @@ def p_tuple_literal(p):
                      | PARENL expression COMMA PARENR
                      | PARENL expression COMMA expression_list PARENR
                      | PARENL expression COMMA expression_list COMMA PARENR'''
+    p[0] = 'tuple'
 
 # Lista de expresiones separadas por coma
 def p_expression_list(p):
     '''expression_list : expression
                        | expression_list COMMA expression'''
+    p[0] = [p[1]] if len(p) == 2 else p[1] + [p[3]]
 
 # Arreglos y tuplas se pueden usar como cualquier expresion (por ejemplo, un arreglo dentro de otro)
 def p_expression_estructuras(p):
