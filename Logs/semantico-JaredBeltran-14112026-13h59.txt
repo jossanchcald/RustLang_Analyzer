@@ -1,0 +1,15 @@
+[[[[[ ERRORES SEMÁNTICOS ]]]]]
+Error semántico (línea 1): la instrucción ‘return’ se encuentra fuera del cuerpo de una función
+Error semántico (línea 4): la instrucción ‘return’ se encuentra fuera del cuerpo de una función
+Error semántico (línea 8): el tipo de retorno f64 no coincide con el tipo declarado i32
+Error semántico (línea 13): la función espera un retorno de tipo i32
+Error semántico (línea 18): se retorna valor en una función que no define retorno
+Error semántico de retorno (línea 22): la función ‘obtener_edad’ puede finalizar sin devolver un valor de tipo i32
+Error semántico (línea 29): la función definida no devuelve un valor en todos los caminos de ejecución
+Error semántico (línea 38): el tipo de retorno i32 no es válido para la función ‘main’
+Error semántico (línea 40): la condición de if debe ser de tipo bool, pero se recibió i32
+Error semántico (línea 43): la condición de while debe ser de tipo bool, pero se recibió i32
+Error semántico (línea 48): el arreglo ‘numeros’ requiere elementos enteros; se encontró un valor bool
+Error semántico (línea 51): la instrucción ‘break’ solo puede utilizarse dentro de un ciclo
+Error semántico (línea 52): palabra reservada continue ubicada fuera de bucle
+Error semántico (línea 58): la estructura else debe estar precedida por una estructura if
