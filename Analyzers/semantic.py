@@ -247,6 +247,8 @@ def verificarAsignacion(nombre, operador, tipoValor, linea):
         verificarTipoAsignado(nombre, ficha["tipo"], tipoValor, linea, 'asignación')
     elif nombre in tabla_simbolos["constantes"]:
         agregarErrorSemantico(linea, f"no se puede modificar la constante '{nombre}'")
+    else:
+        verificarUsoVariable(nombre, linea)  # Semantico (David). Regla Identificadores 3: asignar a algo no declarado
 
 
 def definirStruct(nombre, campos):
@@ -268,8 +270,6 @@ def verificarCamposStruct(nombreStruct, campos):
 # Fin parte de Josue Sanchez Calderon ////////////////////////////////////////////////////////////
 
 # Inicio parte de Leiner David Saltos Penafiel ///////////////////////////////////////////////////
-
-# La pila de ambitos esta en tabla_simbolos["ambitos"] (arriba, junto al resto de la tabla)
 
 historial_simbolos = []
 
@@ -316,10 +316,8 @@ def reiniciarAmbitos():
     historial_simbolos.clear()
     parametros_pendientes.clear()
     variable_for_pendiente.clear()
+    usos_pendientes.clear()
 
-
-# Parametros de funcion. PLY lee '(a: i32, b: i32)' ANTES de completar la cabecera 'fn nombre(...)',
-# es decir, antes de que exista el ambito de la funcion. Por eso se guardan aqui y se declaran al abrirlo
 parametros_pendientes = []
 
 def agregarParametroPendiente(nombre, tipo, linea):
@@ -346,6 +344,23 @@ def abrirAmbitoFor():
     for ficha in variable_for_pendiente:
         declararSimbolo(ficha)
     variable_for_pendiente.clear()
+
+# Regla Identificadores 3 (David)
+usos_pendientes = []  # (nombre, linea)
+
+def verificarUsoVariable(nombre, linea):
+    if buscarSimbolo(nombre) is not None:      # variable visible en algun ambito abierto
+        return
+    if nombre in tabla_simbolos["constantes"]: # constante ya declarada
+        return
+    usos_pendientes.append((nombre, linea))
+
+def verificarUsosPendientes():
+    for nombre, linea in usos_pendientes:
+        if nombre in tabla_simbolos["constantes"]: # era una constante declarada mas abajo
+            continue
+        agregarErrorSemantico(linea, f"la variable '{nombre}' no ha sido declarada")
+    usos_pendientes.clear()
 
 # Regla 4
 def verificarConstanteDeclarada(nombre, linea):

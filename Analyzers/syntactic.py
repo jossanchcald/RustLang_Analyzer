@@ -5,6 +5,14 @@ from Analyzers.semantic import *
 
 syntacticErrors = []
 
+# Semantico (David). Regla de inicio que envuelve todo el programa. 'program' se reduce una vez por cada
+# sentencia, pero 'inicio' solo una vez, al terminar el archivo: es el momento de las revisiones finales
+start = 'inicio'
+
+def p_inicio(p):
+    'inicio : program'
+    verificarUsosPendientes()  # Semantico (David). Regla Identificadores 3: usos que no eran constantes globales
+
 # Regla inicial para que se pueda leer mas de una linea
 def p_program(p):
     '''program : statement
@@ -136,6 +144,7 @@ def p_expression_value(p):
 
 def p_expression_ident(p):
     'expression : ident'
+    verificarUsoVariable(p[1], p.lineno(1))  # Semantico (David). Regla Identificadores 3
     p[0] = buscarVariable(p[1])  # Semantico (Jared). Aqui el tipo de la variable segun la tabla de simbolos
 
 def p_expression_call(p):
@@ -266,6 +275,7 @@ def p_expression_mutable_reference(p):
 
 def p_input_statement(p):
     'input_statement : IDENTIFIER DOUBLE_COLON IDENTIFIER DOUBLE_COLON IDENTIFIER PARENL PARENR PERIOD IDENTIFIER PARENL AMPERSAND MUT ident PARENR PERIOD IDENTIFIER PARENL STRING PARENR SEMICOLON'
+    verificarUsoVariable(p[13], p.lineno(13))  # Semantico (David). Regla Identificadores 3: la variable de '&mut ...'
     for position, name in ((1, 'std'), (3, 'io'), (5, 'stdin'), (9, 'read_line'), (16, 'expect')):
         if p[position] != name:
             column = findColumn(p.lexer.lexdata, p.lexpos(position))
@@ -382,12 +392,21 @@ def p_expression_string_from(p):
 
 # Closures: |a, b| a + b   |x: i32| -> i32 { x + 1 }
 def p_expression_closure(p):
-    '''expression : PIPE closure_params PIPE expression %prec CLOSURE
-                  | PIPE closure_params PIPE return_block
-                  | PIPE closure_params PIPE ARROW data_type return_block
+    '''expression : closure_head expression %prec CLOSURE
+                  | closure_head return_block
+                  | closure_head ARROW data_type return_block
                   | OR expression %prec CLOSURE
                   | OR return_block
                   | OR ARROW data_type return_block'''
+    if p.slice[1].type == 'closure_head':
+        cerrarAmbito()  # Semantico (David). Termino el closure: sus parametros desaparecen
+
+# Semantico (David). Cabecera '|params|' como regla propia: PLY la completa antes de leer el cuerpo,
+# asi que aqui se abre el ambito del closure y se declaran sus parametros (antes 'PIPE closure_params PIPE')
+def p_closure_head(p):
+    'closure_head : PIPE closure_params PIPE'
+    abrirAmbito("closure")
+    declararParametrosPendientes()
 
 def p_closure_params(p):
     '''closure_params : closure_param
@@ -396,6 +415,9 @@ def p_closure_params(p):
 def p_closure_param(p):
     '''closure_param : ident
                      | ident COLON data_type'''
+    # Semantico (David). Como los parametros de funcion: queda pendiente hasta que closure_head abra el ambito.
+    # Sin tipo escrito ('|x|') el tipo queda desconocido (None)
+    agregarParametroPendiente(p[1], p[3] if len(p) == 4 else None, p.lineno(1))
 
 # Fin parte de Josue Sanchez Calderon /////////////////////////////////////////////////////////////////////////
 
