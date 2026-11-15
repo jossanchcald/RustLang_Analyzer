@@ -1,15 +1,11 @@
 # Errores semanticos guardados como (linea, texto)
 semanticErrors = []
 
-# Tabla de simbolos: nombre -> tipo
+# Tabla de simbolos
 tabla_simbolos = {
-    "variables": {},
-    "funciones": {}, # 'unit' si no devuelve nada
-    "constantes": {},
+    "funciones": {}, # nombre -> tipo de retorno ('unit' si no devuelve nada)
+    "constantes": {}, # nombre -> tipo
     "structs": {}, # nombre -> {campo: tipo}
-    "mutabilidad": {}, # nombre -> 'mut', 'inmut' o 'sin_valor' (let sin valor inicial)
-    # Semantico (David). Pila de ambitos: cada ambito es {"nombre": ..., "simbolos": {nombre: ficha}}
-    # El primero siempre es el global y nunca se quita
     "ambitos": [{"nombre": "global", "simbolos": {}}],
 }
 
@@ -26,7 +22,6 @@ METODOS_CONOCIDOS = {'len': 'usize', 'to_string': 'String'}
 
 def reiniciarSemantica():
     semanticErrors.clear()
-    tabla_simbolos["variables"].clear()
     tabla_simbolos["funciones"].clear()
     tabla_simbolos["constantes"].clear()
     contexto["funcion"] = None
@@ -34,9 +29,7 @@ def reiniciarSemantica():
     contexto["breaks"] = []
     pila_funciones.clear()
     tabla_simbolos["structs"].clear()
-    tabla_simbolos["mutabilidad"].clear()
-    reiniciarAmbitos()  
-
+    reiniciarAmbitos()  # Semantico (David)
 
 def agregarErrorSemantico(linea, mensaje, prefijo="Error semántico"):
     item = (linea, f"{prefijo} (línea {linea}): {mensaje}")
@@ -121,8 +114,9 @@ def aritmetica(a, b):
 
 
 def buscarVariable(nombre):
-    if nombre in tabla_simbolos["variables"]:
-        return tabla_simbolos["variables"][nombre]
+    ficha = buscarSimbolo(nombre)  # Semantico (David). Busca en la pila de ambitos, del mas interno al global
+    if ficha is not None:
+        return ficha["tipo"]
     return tabla_simbolos["constantes"].get(nombre)
 
 
@@ -150,6 +144,8 @@ def iniciarFuncion(nombre, linea):
     contexto["ciclos"] = 0
     contexto["breaks"] = []
     tabla_simbolos["funciones"][nombre] = 'unit'
+    abrirAmbito(nombre)  # Semantico (David). Cada funcion tiene su propio ambito
+    declararParametrosPendientes()  # Semantico (David). Los parametros se leyeron antes que la cabecera
 
 
 def terminarFuncion():
@@ -157,7 +153,7 @@ def terminarFuncion():
         contexto["funcion"], contexto["ciclos"], contexto["breaks"] = pila_funciones.pop()
     else:
         contexto["funcion"], contexto["ciclos"], contexto["breaks"] = None, 0, []
-    tabla_simbolos["variables"].clear()
+    cerrarAmbito()  # Semantico (David). Antes se vaciaban todas las variables; ahora solo las de esta funcion
 
 
 def entrarCiclo():
@@ -225,8 +221,11 @@ def declararVariable(nombre, mutable, tipoDeclarado, tieneValor, tipoValor, line
 
     if isinstance(tipoValor, TipoLlamada):
         tipoValor = str(tipoValor)
-    tabla_simbolos["variables"][nombre] = tipoDeclarado if tipoDeclarado is not None else tipoValor
-    tabla_simbolos["mutabilidad"][nombre] = 'mut' if mutable else ('inmut' if tieneValor else 'sin_valor')
+    # Semantico (David). Tipo y mutabilidad se guardan en una ficha dentro del ambito actual,
+    # junto con el estado de inicializacion (regla Identificadores 5)
+    tipo = tipoDeclarado if tipoDeclarado is not None else tipoValor
+    estado = 'mut' if mutable else ('inmut' if tieneValor else 'sin_valor')
+    declararSimbolo(crearFicha(nombre, tipo, estado, tieneValor, linea))
 
 
 def declararConstante(nombre, tipoDeclarado, tipoValor, linea):
@@ -237,13 +236,15 @@ def declararConstante(nombre, tipoDeclarado, tipoValor, linea):
 
 # Operador: '=', '+=', '-=', '*=', '/=' o '%='
 def verificarAsignacion(nombre, operador, tipoValor, linea):
-    if nombre in tabla_simbolos["variables"]:
-        estado = tabla_simbolos["mutabilidad"].get(nombre) # None es parametro o variable de for asi q no se revisa
+    ficha = buscarSimbolo(nombre)  # Semantico (David). La variable se busca en la pila de ambitos
+    if ficha is not None:
+        estado = ficha["estado"] # None es parametro o variable de for asi q no se revisa
         if estado == 'inmut' or (estado == 'sin_valor' and operador != '='):
             agregarErrorSemantico(linea, f"no se puede modificar la variable inmutable '{nombre}'")
         elif estado == 'sin_valor':
-            tabla_simbolos["mutabilidad"][nombre] = 'inmut' # la primera asignacion si se permite
-        verificarTipoAsignado(nombre, tabla_simbolos["variables"][nombre], tipoValor, linea, 'asignación')
+            ficha["estado"] = 'inmut' # la primera asignacion si se permite
+        ficha["inicializada"] = True  # Semantico (David). Ya recibio un valor (regla Identificadores 5)
+        verificarTipoAsignado(nombre, ficha["tipo"], tipoValor, linea, 'asignación')
     elif nombre in tabla_simbolos["constantes"]:
         agregarErrorSemantico(linea, f"no se puede modificar la constante '{nombre}'")
 
@@ -313,6 +314,21 @@ def reiniciarAmbitos():
     tabla_simbolos["ambitos"].clear()
     tabla_simbolos["ambitos"].append({"nombre": "global", "simbolos": {}})
     historial_simbolos.clear()
+    parametros_pendientes.clear()
+
+
+# Parametros de funcion. PLY lee '(a: i32, b: i32)' ANTES de completar la cabecera 'fn nombre(...)',
+# es decir, antes de que exista el ambito de la funcion. Por eso se guardan aqui y se declaran al abrirlo
+parametros_pendientes = []
+
+def agregarParametroPendiente(nombre, tipo, linea):
+    # estado None: Josue no revisa la mutabilidad de los parametros. Inicializada: el valor llega en la llamada
+    parametros_pendientes.append(crearFicha(nombre, tipo, None, True, linea))
+
+def declararParametrosPendientes():
+    for ficha in parametros_pendientes:
+        declararSimbolo(ficha)
+    parametros_pendientes.clear()
 
 # Regla 4
 def verificarConstanteDeclarada(nombre, linea):

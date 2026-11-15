@@ -163,8 +163,8 @@ def p_parameter(p):
     '''parameter : ident COLON data_type
                  | MUT ident COLON data_type'''
     # Semantico (Jared). Aqui el parametro entra a la tabla de simbolos con su tipo
-    tabla_simbolos["variables"][p[len(p) - 3]] = p[len(p) - 1]
-    tabla_simbolos["mutabilidad"].pop(p[len(p) - 3], None) # Semantico (Josue)
+    # Semantico (David). Queda pendiente hasta que se abra el ambito de la funcion (en iniciarFuncion)
+    agregarParametroPendiente(p[len(p) - 3], p[len(p) - 1], p.lineno(len(p) - 2))
 
 def p_function_call(p):
     '''function_call : IDENTIFIER PARENL PARENR
@@ -338,8 +338,9 @@ def p_for_variable(p):
     '''for_variable : ident
                     | UNDERSCORE'''
     if p.slice[1].type == 'ident':
-        tabla_simbolos["variables"][p[1]] = None  # Semantico (Jared). Aqui la variable del for existe, su tipo no se conoce
-        tabla_simbolos["mutabilidad"].pop(p[1], None) # Semantico (Josue)
+        # Semantico (Jared). Aqui la variable del for existe, su tipo no se conoce
+        # Semantico (David). Se guarda en el ambito actual; estado None para que Josue no revise su mutabilidad
+        declararSimbolo(crearFicha(p[1], None, None, True, p.lineno(1)))
 
 # Un rango (a..b) o cualquier expresión que sea una colección
 def p_for_iterable(p):
