@@ -139,6 +139,7 @@ def tipoArreglo(elementos, linea):
 
 
 def iniciarFuncion(nombre, linea):
+    verificarFuncionRepetida(nombre, linea)  # Semantico (David). Regla Identificadores 6: antes de registrarla
     pila_funciones.append((contexto["funcion"], contexto["ciclos"], contexto["breaks"]))
     contexto["funcion"] = {"nombre": nombre, "linea": linea, "tiene_ret": False, "ret": None}
     contexto["ciclos"] = 0
@@ -243,6 +244,7 @@ def verificarAsignacion(nombre, operador, tipoValor, linea):
             agregarErrorSemantico(linea, f"no se puede modificar la variable inmutable '{nombre}'")
         elif estado == 'sin_valor':
             ficha["estado"] = 'inmut' # la primera asignacion si se permite
+        verificarInicializadaCompuesta(ficha, operador, linea)  # Semantico (David). Regla Identificadores 5: 'x += 1' sin valor
         ficha["inicializada"] = True  # Semantico (David). Ya recibio un valor (regla Identificadores 5)
         verificarTipoAsignado(nombre, ficha["tipo"], tipoValor, linea, 'asignación')
     elif nombre in tabla_simbolos["constantes"]:
@@ -317,6 +319,7 @@ def reiniciarAmbitos():
     parametros_pendientes.clear()
     variable_for_pendiente.clear()
     usos_pendientes.clear()
+    llamadas_pendientes.clear()
 
 parametros_pendientes = []
 
@@ -326,7 +329,17 @@ def agregarParametroPendiente(nombre, tipo, linea):
 
 def declararParametrosPendientes():
     for ficha in parametros_pendientes:
+        # Regla 6: el ambito de la funcion (o closure) acaba de abrirse, asi que si el nombre ya esta
+        # en el, es porque otro parametro de la misma lista se llama igual
+        if ficha["nombre"] in tabla_simbolos["ambitos"][-1]["simbolos"]:
+            agregarErrorSemantico(ficha["linea"], f"repetición de variables parámetros: '{ficha['nombre']}'")
+            continue
         declararSimbolo(ficha)
+    parametros_pendientes.clear()
+
+# Con un error de sintaxis, los parametros ya leidos pertenecen a una cabecera que PLY descarto
+# (por ejemplo '|x x + 1'). Si no se borran, se pegarian a la siguiente funcion o closure
+def descartarParametrosPendientes():
     parametros_pendientes.clear()
 
 
@@ -349,7 +362,12 @@ def abrirAmbitoFor():
 usos_pendientes = []  # (nombre, linea)
 
 def verificarUsoVariable(nombre, linea):
-    if buscarSimbolo(nombre) is not None:      # variable visible en algun ambito abierto
+    ficha = buscarSimbolo(nombre)
+    if ficha is not None:                      # variable visible en algun ambito abierto
+        # Regla 5: existe, pero se declaro sin valor y todavia no se le asigno uno
+        if not ficha["inicializada"]:
+            agregarErrorSemantico(linea, f"la variable '{nombre}' se utiliza antes de haber sido inicializada",
+                                  "Error semántico de identificadores")
         return
     if nombre in tabla_simbolos["constantes"]: # constante ya declarada
         return
@@ -372,6 +390,36 @@ def verificarConstanteDeclarada(nombre, linea):
         agregarErrorSemantico(linea, f"la constante '{nombre}' ya fue declarada en este ámbito")
         return False
     return True
+
+# Regla 5: 'x += 1' lee el valor de x antes de cambiarlo, asi que x ya debe tener valor.
+# Solo para 'mut': si es 'sin_valor', Josue ya reporta que no se puede modificar
+def verificarInicializadaCompuesta(ficha, operador, linea):
+    if operador != '=' and ficha["estado"] == 'mut' and not ficha["inicializada"]:
+        agregarErrorSemantico(linea, f"la variable '{ficha['nombre']}' se utiliza antes de haber sido inicializada",
+                              "Error semántico de identificadores")
+
+# Regla 6: dos funciones con el mismo nombre. Se llama antes de que iniciarFuncion la registre
+def verificarFuncionRepetida(nombre, linea):
+    if nombre in tabla_simbolos["funciones"]:
+        agregarErrorSemantico(linea, f"la función '{nombre}' ya fue declarada")
+
+# Regla 2: funcion llamada sin estar declarada. Como la regla 3, se revisa al final,
+# porque en Rust una funcion puede declararse mas abajo de donde se llama
+llamadas_pendientes = []  # (nombre, linea)
+
+def verificarLlamadaFuncion(nombre, linea):
+    if nombre in tabla_simbolos["funciones"]: # ya declarada
+        return
+    if buscarSimbolo(nombre) is not None:     # variable visible, por ejemplo un closure: add(1, 2)
+        return
+    llamadas_pendientes.append((nombre, linea))
+
+def verificarLlamadasPendientes():
+    for nombre, linea in llamadas_pendientes:
+        if nombre in tabla_simbolos["funciones"]: # se declaro mas abajo
+            continue
+        agregarErrorSemantico(linea, f"la función '{nombre}' no está declarada")
+    llamadas_pendientes.clear()
 
 
 # Fin parte de Leiner David Saltos Penafiel ///////////////////////////////////////////////////

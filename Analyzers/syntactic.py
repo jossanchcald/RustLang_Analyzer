@@ -12,6 +12,7 @@ start = 'inicio'
 def p_inicio(p):
     'inicio : program'
     verificarUsosPendientes()  # Semantico (David). Regla Identificadores 3: usos que no eran constantes globales
+    verificarLlamadasPendientes()  # Semantico (David). Regla Identificadores 2: llamadas a funciones que nunca se declararon
 
 # Regla inicial para que se pueda leer mas de una linea
 def p_program(p):
@@ -178,6 +179,7 @@ def p_parameter(p):
 def p_function_call(p):
     '''function_call : IDENTIFIER PARENL PARENR
                      | IDENTIFIER PARENL arguments PARENR'''
+    verificarLlamadaFuncion(p[1], p.lineno(1))  # Semantico (David). Regla Identificadores 2
     p[0] = tipoLlamada(p[1])  # Semantico (Jared / Josue). Aqui se obtiene el tipo que devuelve la funcion
 
 def p_arguments(p):
@@ -687,6 +689,7 @@ def p_error(p):
     else:
         mensaje = "Error de sintaxis: fin de entrada inesperado"
     syntacticErrors.append(mensaje)
+    descartarParametrosPendientes()  # Semantico (David). Evita falsos 'repetición de variables parámetros' (regla 6)
 
 # Build the parser
 parser = yacc.yacc()
