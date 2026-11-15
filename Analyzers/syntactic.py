@@ -5,14 +5,17 @@ from Analyzers.semantic import *
 
 syntacticErrors = []
 
-# Semantico (David). Regla de inicio que envuelve todo el programa. 'program' se reduce una vez por cada
-# sentencia, pero 'inicio' solo una vez, al terminar el archivo: es el momento de las revisiones finales
+# Usado en revisiones al final (Leiner)
 start = 'inicio'
+
+# Usado en mensajes con columna (Leiner)
+def columnaDe(p, i):
+    return findColumn(p.lexer.lexdata, p.lexpos(i))
 
 def p_inicio(p):
     'inicio : program'
-    verificarUsosPendientes()  # Semantico (David). Regla Identificadores 3: usos que no eran constantes globales
-    verificarLlamadasPendientes()  # Semantico (David). Regla Identificadores 2: llamadas a funciones que nunca se declararon
+    verificarUsosPendientes()  # Regla Identificadores 3 (Leiner)
+    verificarLlamadasPendientes()  # Regla Identificadores 2 (Leiner)
 
 # Regla inicial para que se pueda leer mas de una linea
 def p_program(p):
@@ -72,12 +75,13 @@ def p_variable_declaration(p):
                             | DECLARATION MUT ident COLON data_type SEMICOLON'''
     # Semantico (Jared). Aqui guarda el tipo de la variable en la tabla (el declarado, o el del valor inicial)
     # y revisa que un arreglo tenga todos sus elementos del mismo tipo (Asignacion de tipo 4)
-    nombre = tipoDeclarado = tipoValor = None
+    nombre = tipoDeclarado = tipoValor = columna = None
     tieneValor = mutable = False
     for i in range(1, len(p)):
         simbolo = p.slice[i].type
         if simbolo == 'ident':
             nombre = p[i]
+            columna = columnaDe(p, i)  # Usado en mensajes con columna (Leiner)
         elif simbolo == 'data_type':
             tipoDeclarado = p[i]
         elif simbolo == 'initializer':
@@ -86,11 +90,11 @@ def p_variable_declaration(p):
         elif simbolo == 'MUT':
             mutable = True
     reglaAsignacion4(nombre, tipoValor)
-    declararVariable(nombre, mutable, tipoDeclarado, tieneValor, tipoValor, p.lineno(1))
+    declararVariable(nombre, mutable, tipoDeclarado, tieneValor, tipoValor, p.lineno(1), columna)
 
 def p_constant_declaration(p):
     'constant_declaration : CONSTANT ident COLON data_type EQUAL expression SEMICOLON'
-    declararConstante(p[2], p[4], p[6], p.lineno(1)) # Semantico (Jared / Josue). Aqui se guarda el tipo de la constante
+    declararConstante(p[2], p[4], p[6], p.lineno(1), columnaDe(p, 2)) # Semantico (Jared / Josue). Aqui se guarda el tipo de la constante
 
 def p_data_type(p):
     '''data_type : TYPE_I8
@@ -145,7 +149,7 @@ def p_expression_value(p):
 
 def p_expression_ident(p):
     'expression : ident'
-    verificarUsoVariable(p[1], p.lineno(1))  # Semantico (David). Regla Identificadores 3
+    verificarUsoVariable(p[1], p.lineno(1), columnaDe(p, 1))  # Regla Identificadores 3 (Leiner)
     p[0] = buscarVariable(p[1])  # Semantico (Jared). Aqui el tipo de la variable segun la tabla de simbolos
 
 def p_expression_call(p):
@@ -173,13 +177,13 @@ def p_parameter(p):
     '''parameter : ident COLON data_type
                  | MUT ident COLON data_type'''
     # Semantico (Jared). Aqui el parametro entra a la tabla de simbolos con su tipo
-    # Semantico (David). Queda pendiente hasta que se abra el ambito de la funcion (en iniciarFuncion)
-    agregarParametroPendiente(p[len(p) - 3], p[len(p) - 1], p.lineno(len(p) - 2))
+    # Usado en pila de ámbitos (Leiner)
+    agregarParametroPendiente(p[len(p) - 3], p[len(p) - 1], p.lineno(len(p) - 2), columnaDe(p, len(p) - 3))
 
 def p_function_call(p):
     '''function_call : IDENTIFIER PARENL PARENR
                      | IDENTIFIER PARENL arguments PARENR'''
-    verificarLlamadaFuncion(p[1], p.lineno(1))  # Semantico (David). Regla Identificadores 2
+    verificarLlamadaFuncion(p[1], p.lineno(1), columnaDe(p, 1))  # Regla Identificadores 2 (Leiner)
     p[0] = tipoLlamada(p[1])  # Semantico (Jared / Josue). Aqui se obtiene el tipo que devuelve la funcion
 
 def p_arguments(p):
@@ -192,10 +196,9 @@ def p_block(p):
     # Semantico (Jared). Aqui el bloque deja la lista de sentencias y si garantiza devolver un valor
     sentencias = p[2] if len(p) == 4 else []
     p[0] = {'sentencias': sentencias, 'devuelve': bloqueDevuelve(sentencias)}
-    cerrarAmbito()  # Semantico (David). Al llegar a '}' las variables del bloque desaparecen
+    cerrarAmbito()  # Usado en pila de ámbitos (Leiner)
 
-# Semantico (David). Regla "marcador": solo contiene la '{', asi que PLY la completa apenas la lee,
-# ANTES de procesar el contenido del bloque. Es el momento para abrir el ambito del bloque
+# Usado en pila de ámbitos (Leiner)
 def p_block_start(p):
     'block_start : BRACEL'
     abrirAmbito("bloque")
@@ -277,7 +280,7 @@ def p_expression_mutable_reference(p):
 
 def p_input_statement(p):
     'input_statement : IDENTIFIER DOUBLE_COLON IDENTIFIER DOUBLE_COLON IDENTIFIER PARENL PARENR PERIOD IDENTIFIER PARENL AMPERSAND MUT ident PARENR PERIOD IDENTIFIER PARENL STRING PARENR SEMICOLON'
-    verificarUsoVariable(p[13], p.lineno(13))  # Semantico (David). Regla Identificadores 3: la variable de '&mut ...'
+    verificarUsoVariable(p[13], p.lineno(13), columnaDe(p, 13))  # Regla Identificadores 3 (Leiner)
     for position, name in ((1, 'std'), (3, 'io'), (5, 'stdin'), (9, 'read_line'), (16, 'expect')):
         if p[position] != name:
             column = findColumn(p.lexer.lexdata, p.lexpos(position))
@@ -322,7 +325,7 @@ def p_expression_not(p):
 
 def p_expression_cast(p):
     'expression : expression AS data_type'
-    verificarConversionAs(p[1], p[3], p.lineno(2))  # Semantico (David). Reglas Conversion 6, 5 y 2
+    verificarConversionAs(p[1], p[3], p.lineno(2), columnaDe(p, 2))  # Regla Conversión 2, 5 y 6 (Leiner)
     p[0] = p[3]  # Semantico (Jared). Aqui el resultado tiene el tipo al que se convierte
 
 def p_expression_group(p):
@@ -336,25 +339,25 @@ def p_assignment_compound(p):
                   | ident TIMES_EQUAL expression SEMICOLON
                   | ident DIV_EQUAL expression SEMICOLON
                   | ident MOD_EQUAL expression SEMICOLON'''
-    verificarAsignacion(p[1], p[2], p[3], p.lineno(2)) # Semántico (Josue)
+    verificarAsignacion(p[1], p[2], p[3], p.lineno(2), columnaDe(p, 1)) # Semántico (Josue)
 
 # for con rango o coleccion
 # Semantico (Jared). Aqui la cabecera del for es una regla propia para contar el ciclo antes de leer el cuerpo
 def p_for_statement(p):
     'for_statement : for_header block'
     salirCiclo()
-    cerrarAmbito()  # Semantico (David). Al terminar el for, su variable desaparece
+    cerrarAmbito()  # Usado en pila de ámbitos (Leiner)
 
 def p_for_header(p):
     'for_header : FOR for_variable IN for_iterable'
     entrarCiclo()
-    abrirAmbitoFor()  # Semantico (David). Ambito propio del for, con su variable dentro
+    abrirAmbitoFor()  # Usado en pila de ámbitos (Leiner)
 
 def p_for_error(p):
     'for_header : FOR error'
     addSyntacticError(p, 1, "'for' mal formado: se esperaba 'for variable in rango_o_colección { ... }'")
     entrarCiclo()
-    abrirAmbitoFor()  # Semantico (David). Tambien aqui, para que el cerrarAmbito de p_for_statement quede equilibrado
+    abrirAmbitoFor()  # Usado en pila de ámbitos (Leiner)
 
 # Un for puede ser, for x in y puede ser for _ in
 def p_for_variable(p):
@@ -362,7 +365,7 @@ def p_for_variable(p):
                     | UNDERSCORE'''
     if p.slice[1].type == 'ident':
         # Semantico (Jared). Aqui la variable del for existe, su tipo no se conoce
-        # Semantico (David). Queda pendiente hasta que for_header abra el ambito del for
+        # Usado en pila de ámbitos (Leiner)
         agregarVariableForPendiente(p[1], p.lineno(1))
 
 # Un rango (a..b) o cualquier expresión que sea una colección
@@ -402,10 +405,9 @@ def p_expression_closure(p):
                   | OR return_block
                   | OR ARROW data_type return_block'''
     if p.slice[1].type == 'closure_head':
-        cerrarAmbito()  # Semantico (David). Termino el closure: sus parametros desaparecen
+        cerrarAmbito()  # Usado en pila de ámbitos (Leiner)
 
-# Semantico (David). Cabecera '|params|' como regla propia: PLY la completa antes de leer el cuerpo,
-# asi que aqui se abre el ambito del closure y se declaran sus parametros (antes 'PIPE closure_params PIPE')
+# Usado en pila de ámbitos (Leiner)
 def p_closure_head(p):
     'closure_head : PIPE closure_params PIPE'
     abrirAmbito("closure")
@@ -418,9 +420,8 @@ def p_closure_params(p):
 def p_closure_param(p):
     '''closure_param : ident
                      | ident COLON data_type'''
-    # Semantico (David). Como los parametros de funcion: queda pendiente hasta que closure_head abra el ambito.
-    # Sin tipo escrito ('|x|') el tipo queda desconocido (None)
-    agregarParametroPendiente(p[1], p[3] if len(p) == 4 else None, p.lineno(1))
+    # Usado en pila de ámbitos (Leiner)
+    agregarParametroPendiente(p[1], p[3] if len(p) == 4 else None, p.lineno(1), columnaDe(p, 1))
 
 # Fin parte de Josue Sanchez Calderon /////////////////////////////////////////////////////////////////////////
 
@@ -501,7 +502,7 @@ def reglaRetorno6(funcion):
 def p_assignment(p):
     'assignment : ident EQUAL expression SEMICOLON'
     reglaAsignacion4(p[1], p[3])
-    verificarAsignacion(p[1], '=', p[3], p.lineno(2)) # Semántico (Josue)
+    verificarAsignacion(p[1], '=', p[3], p.lineno(2), columnaDe(p, 1)) # Semántico (Josue)
 
 # 2. Condicionales
 # La condicion es una 'expression'
@@ -592,11 +593,11 @@ def p_expression_estructuras(p):
 # asi, cuando se lee el cuerpo, ya se sabe en que funcion estamos y que tipo debe devolver
 def p_function_head_np(p):
     'function_head_np : FUNCTION IDENTIFIER PARENL PARENR'
-    iniciarFuncion(p[2], p.lineno(2))
+    iniciarFuncion(p[2], p.lineno(2), columnaDe(p, 2))
 
 def p_function_head_p(p):
     'function_head_p : FUNCTION IDENTIFIER PARENL parameters PARENR'
-    iniciarFuncion(p[2], p.lineno(2))
+    iniciarFuncion(p[2], p.lineno(2), columnaDe(p, 2))
 
 def p_ret_spec(p):
     'ret_spec : ARROW data_type'
@@ -690,7 +691,7 @@ def p_error(p):
     else:
         mensaje = "Error de sintaxis: fin de entrada inesperado"
     syntacticErrors.append(mensaje)
-    descartarParametrosPendientes()  # Semantico (David). Evita falsos 'repetición de variables parámetros' (regla 6)
+    descartarParametrosPendientes()  # Regla Identificadores 6 (Leiner)
 
 # Build the parser
 parser = yacc.yacc()
