@@ -176,11 +176,18 @@ def p_arguments(p):
                  | arguments COMMA expression'''
 
 def p_block(p):
-    '''block : BRACEL BRACER
-             | BRACEL body BRACER'''
+    '''block : block_start BRACER
+             | block_start body BRACER'''
     # Semantico (Jared). Aqui el bloque deja la lista de sentencias y si garantiza devolver un valor
     sentencias = p[2] if len(p) == 4 else []
     p[0] = {'sentencias': sentencias, 'devuelve': bloqueDevuelve(sentencias)}
+    cerrarAmbito()  # Semantico (David). Al llegar a '}' las variables del bloque desaparecen
+
+# Semantico (David). Regla "marcador": solo contiene la '{', asi que PLY la completa apenas la lee,
+# ANTES de procesar el contenido del bloque. Es el momento para abrir el ambito del bloque
+def p_block_start(p):
+    'block_start : BRACEL'
+    abrirAmbito("bloque")
 
 def p_body(p):
     '''body : statement
@@ -323,15 +330,18 @@ def p_assignment_compound(p):
 def p_for_statement(p):
     'for_statement : for_header block'
     salirCiclo()
+    cerrarAmbito()  # Semantico (David). Al terminar el for, su variable desaparece
 
 def p_for_header(p):
     'for_header : FOR for_variable IN for_iterable'
     entrarCiclo()
+    abrirAmbitoFor()  # Semantico (David). Ambito propio del for, con su variable dentro
 
 def p_for_error(p):
     'for_header : FOR error'
     addSyntacticError(p, 1, "'for' mal formado: se esperaba 'for variable in rango_o_colección { ... }'")
     entrarCiclo()
+    abrirAmbitoFor()  # Semantico (David). Tambien aqui, para que el cerrarAmbito de p_for_statement quede equilibrado
 
 # Un for puede ser, for x in y puede ser for _ in
 def p_for_variable(p):
@@ -339,8 +349,8 @@ def p_for_variable(p):
                     | UNDERSCORE'''
     if p.slice[1].type == 'ident':
         # Semantico (Jared). Aqui la variable del for existe, su tipo no se conoce
-        # Semantico (David). Se guarda en el ambito actual; estado None para que Josue no revise su mutabilidad
-        declararSimbolo(crearFicha(p[1], None, None, True, p.lineno(1)))
+        # Semantico (David). Queda pendiente hasta que for_header abra el ambito del for
+        agregarVariableForPendiente(p[1], p.lineno(1))
 
 # Un rango (a..b) o cualquier expresión que sea una colección
 def p_for_iterable(p):

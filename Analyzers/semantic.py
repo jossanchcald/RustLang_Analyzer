@@ -315,6 +315,7 @@ def reiniciarAmbitos():
     tabla_simbolos["ambitos"].append({"nombre": "global", "simbolos": {}})
     historial_simbolos.clear()
     parametros_pendientes.clear()
+    variable_for_pendiente.clear()
 
 
 # Parametros de funcion. PLY lee '(a: i32, b: i32)' ANTES de completar la cabecera 'fn nombre(...)',
@@ -329,6 +330,22 @@ def declararParametrosPendientes():
     for ficha in parametros_pendientes:
         declararSimbolo(ficha)
     parametros_pendientes.clear()
+
+
+# Variable del for. Pasa lo mismo que con los parametros: en 'for i in 0..5', PLY completa 'i'
+# antes que la cabecera del for. Se guarda aqui y se declara cuando se abre el ambito del for
+variable_for_pendiente = []
+
+def agregarVariableForPendiente(nombre, linea):
+    # tipo None: no se conoce. estado None: Josue no revisa su mutabilidad. Inicializada: toma cada valor del rango
+    variable_for_pendiente.append(crearFicha(nombre, None, None, True, linea))
+
+# Se llama desde la cabecera del for: abre su ambito y mete ahi la variable (si la hay; 'for _ in' no tiene)
+def abrirAmbitoFor():
+    abrirAmbito("for")
+    for ficha in variable_for_pendiente:
+        declararSimbolo(ficha)
+    variable_for_pendiente.clear()
 
 # Regla 4
 def verificarConstanteDeclarada(nombre, linea):
