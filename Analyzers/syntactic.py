@@ -322,6 +322,7 @@ def p_expression_not(p):
 
 def p_expression_cast(p):
     'expression : expression AS data_type'
+    verificarConversionAs(p[1], p[3], p.lineno(2))  # Semantico (David). Reglas Conversion 6, 5 y 2
     p[0] = p[3]  # Semantico (Jared). Aqui el resultado tiene el tipo al que se convierte
 
 def p_expression_group(p):

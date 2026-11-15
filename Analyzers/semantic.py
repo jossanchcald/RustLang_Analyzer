@@ -212,6 +212,8 @@ def verificarTipoAsignado(nombre, esperado, actual, linea, accion):
         return
 
     if not tiposCompatibles(actual, esperado):
+        if verificarConversionImplicita(actual, esperado, linea):  # Semantico (David). Regla Conversion 1: numerico a numerico
+            return
         agregarErrorSemantico(linea, f"tipos incompatibles en la {accion} de '{nombre}', "
                                      f"tipo esperado '{nombreParaMensaje(esperado)}'")
 
@@ -420,6 +422,53 @@ def verificarLlamadasPendientes():
             continue
         agregarErrorSemantico(linea, f"la función '{nombre}' no está declarada")
     llamadas_pendientes.clear()
+
+
+# Conversiones con 'as'. origen: tipo de la expresion; destino: tipo escrito despues de 'as'.
+# Se revisan de la regla mas especifica a la mas general (6, 5 y 2) y se reporta solo un error
+def verificarConversionAs(origen, destino, linea):
+    co, cd = claseDeTipo(origen), claseDeTipo(destino)
+    if co is None or cd is None: # tipo desconocido (None, tupla, struct...): no se reporta nada
+        return
+    nombreOrigen, nombreDestino = nombreParaMensaje(origen), nombreParaMensaje(destino)
+
+    # Regla Conversion 6: nada se convierte a bool con 'as' (salvo bool as bool, que no cambia nada)
+    if cd == 'bool' and co != 'bool':
+        agregarErrorSemantico(linea, f"no se puede convertir un valor de tipo '{nombreOrigen}' a 'bool' "
+                                     f"mediante el operador 'as'", "Error semántico de conversión")
+        return
+
+    # Regla Conversion 5: char <-> flotante y bool -> flotante
+    if (co == 'char' and cd == 'decimal') or (co == 'decimal' and cd == 'char') \
+            or (co == 'bool' and cd == 'decimal'):
+        agregarErrorSemantico(linea, f"conversión inválida con 'as' de tipo '{nombreOrigen}' a tipo '{nombreDestino}'")
+        return
+
+    # Regla Conversion 2: solo se permite lo de esta lista
+    numerico = ('entero', 'decimal')
+    valida = (
+        (co in numerico and cd in numerico)       # numerico <-> numerico
+        or (origen == 'u8' and cd == 'char')      # u8 -> char (otro entero no: '65 as char' falla en Rust)
+        or (co in ('char', 'bool') and cd == 'entero')  # char o bool -> entero
+        or (co == cd and co in ('char', 'bool'))  # char as char, bool as bool (no cambian nada)
+    )
+    if not valida:
+        agregarErrorSemantico(linea, "conversión inválida con as")
+
+
+# Regla Conversion 1: Rust no convierte numeros solos de un tipo a otro ('let b: f64 = a;' con a: i32).
+# Se llama desde verificarTipoAsignado (de Josue) cuando los tipos ya resultaron incompatibles.
+# Devuelve True si era este caso, para que Josue no reporte ademas "tipos incompatibles".
+# Los literales sin sufijo ('int'/'float', como 'let x: f64 = 5;') se dejan con el mensaje de Josue:
+# ahi no hay un valor de otro tipo numerico que convertir, sino un literal mal escrito
+def verificarConversionImplicita(actual, esperado, linea):
+    numerico = ('entero', 'decimal')
+    if claseDeTipo(actual) not in numerico or claseDeTipo(esperado) not in numerico:
+        return False
+    if actual in ('int', 'float'):
+        return False
+    agregarErrorSemantico(linea, f"conversión implícita no permitida de '{nombreDeTipo(actual)}' a '{nombreDeTipo(esperado)}'")
+    return True
 
 
 # Fin parte de Leiner David Saltos Penafiel ///////////////////////////////////////////////////
