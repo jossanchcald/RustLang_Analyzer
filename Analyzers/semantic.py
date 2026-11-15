@@ -353,6 +353,10 @@ def verificarUsoVariable(nombre, linea):
         return
     if nombre in tabla_simbolos["constantes"]: # constante ya declarada
         return
+    # Regla 1
+    if existioAntes(nombre):                   # existio, pero en un ambito ya cerrado
+        agregarErrorSemantico(linea, f"la variable '{nombre}' no es visible en este ámbito")
+        return
     usos_pendientes.append((nombre, linea))
 
 def verificarUsosPendientes():
