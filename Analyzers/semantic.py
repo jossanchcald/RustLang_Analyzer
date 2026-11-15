@@ -6,6 +6,8 @@ tabla_simbolos = {
     "variables": {},
     "funciones": {}, # 'unit' si no devuelve nada
     "constantes": {},
+    "structs": {}, # nombre -> {campo: tipo}
+    "mutabilidad": {}, # nombre -> 'mut', 'inmut' o 'sin_valor' (let sin valor inicial)
 }
 
 # Funcion actual y cantidad de ciclos abiertos
@@ -28,6 +30,8 @@ def reiniciarSemantica():
     contexto["ciclos"] = 0
     contexto["breaks"] = []
     pila_funciones.clear()
+    tabla_simbolos["structs"].clear()
+    tabla_simbolos["mutabilidad"].clear()
 
 
 def agregarErrorSemantico(linea, mensaje, prefijo="Error semántico"):
@@ -170,3 +174,89 @@ def marcarBreak():
 
 def bloqueDevuelve(sentencias):
     return any(s.get('devuelve') for s in sentencias)
+
+# Inicio parte de Josue Sanchez Calderon: asignacion de tipos ////////////////////////////////////
+
+# Tipo que devuelve una llamada a funcion
+class TipoLlamada(str):
+    funcion = None
+
+def tipoLlamada(nombre):
+    tipo = tabla_simbolos["funciones"].get(nombre)
+    if tipo is None:
+        return None
+    resultado = TipoLlamada(tipo)
+    resultado.funcion = nombre
+    return resultado
+
+
+# Para mostrar '&str' en los mensajes
+def nombreParaMensaje(tipo):
+    return '&str' if tipo == 'str' else nombreDeTipo(tipo)
+
+
+# Para las variables, el valor debe tener el tipo que espera la variable
+def verificarTipoAsignado(nombre, esperado, actual, linea, accion):
+    if esperado is None or actual is None:
+        return
+
+    if isinstance(actual, TipoLlamada):
+        if actual == 'unit':
+            if claseDeTipo(esperado) is not None:
+                agregarErrorSemantico(linea, f"la función '{actual.funcion}' devuelve el tipo unitario '()' "
+                                             f"y no puede asignarse a una variable de tipo '{nombreParaMensaje(esperado)}'")
+        elif not tiposCompatibles(actual, esperado):
+            agregarErrorSemantico(linea, f"la función '{actual.funcion}' devuelve el tipo '{nombreParaMensaje(actual)}' "
+                                         f"y no puede asignarse a una variable de tipo '{nombreParaMensaje(esperado)}'")
+        return
+
+    if not tiposCompatibles(actual, esperado):
+        agregarErrorSemantico(linea, f"tipos incompatibles en la {accion} de '{nombre}', "
+                                     f"tipo esperado '{nombreParaMensaje(esperado)}'")
+
+
+def declararVariable(nombre, mutable, tipoDeclarado, tieneValor, tipoValor, linea):
+    if tipoDeclarado is not None and tieneValor:
+        verificarTipoAsignado(nombre, tipoDeclarado, tipoValor, linea, 'declaración')
+
+    if isinstance(tipoValor, TipoLlamada):
+        tipoValor = str(tipoValor)
+    tabla_simbolos["variables"][nombre] = tipoDeclarado if tipoDeclarado is not None else tipoValor
+    tabla_simbolos["mutabilidad"][nombre] = 'mut' if mutable else ('inmut' if tieneValor else 'sin_valor')
+
+
+def declararConstante(nombre, tipoDeclarado, tipoValor, linea):
+    verificarTipoAsignado(nombre, tipoDeclarado, tipoValor, linea, 'declaración')
+    tabla_simbolos["constantes"][nombre] = tipoDeclarado
+
+
+# Operador: '=', '+=', '-=', '*=', '/=' o '%='
+def verificarAsignacion(nombre, operador, tipoValor, linea):
+    if nombre in tabla_simbolos["variables"]:
+        estado = tabla_simbolos["mutabilidad"].get(nombre) # None es parametro o variable de for asi q no se revisa
+        if estado == 'inmut' or (estado == 'sin_valor' and operador != '='):
+            agregarErrorSemantico(linea, f"no se puede modificar la variable inmutable '{nombre}'")
+        elif estado == 'sin_valor':
+            tabla_simbolos["mutabilidad"][nombre] = 'inmut' # la primera asignacion si se permite
+        verificarTipoAsignado(nombre, tabla_simbolos["variables"][nombre], tipoValor, linea, 'asignación')
+    elif nombre in tabla_simbolos["constantes"]:
+        agregarErrorSemantico(linea, f"no se puede modificar la constante '{nombre}'")
+
+
+def definirStruct(nombre, campos):
+    tabla_simbolos["structs"][nombre] = dict(campos)
+
+
+# campos: lista de (nombre_campo, tipo_del_valor, linea)
+def verificarCamposStruct(nombreStruct, campos):
+    definicion = tabla_simbolos["structs"].get(nombreStruct)
+    if definicion is None:
+        return
+    for campo, tipo, linea in campos:
+        esperado = definicion.get(campo)
+        if esperado is None or tipo is None or tiposCompatibles(tipo, esperado):
+            continue
+        agregarErrorSemantico(linea, f"el campo '{campo}' de la estructura '{nombreStruct}' espera un valor "
+                                     f"de tipo '{nombreParaMensaje(esperado)}', pero se asignó '{nombreParaMensaje(tipo)}'")
+
+# Fin parte de Josue Sanchez Calderon ////////////////////////////////////////////////////////////

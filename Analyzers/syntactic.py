@@ -64,6 +64,7 @@ def p_variable_declaration(p):
     # Semantico (Jared). Aqui guarda el tipo de la variable en la tabla (el declarado, o el del valor inicial)
     # y revisa que un arreglo tenga todos sus elementos del mismo tipo (Asignacion de tipo 4)
     nombre = tipoDeclarado = tipoValor = None
+    tieneValor = mutable = False
     for i in range(1, len(p)):
         simbolo = p.slice[i].type
         if simbolo == 'ident':
@@ -72,12 +73,15 @@ def p_variable_declaration(p):
             tipoDeclarado = p[i]
         elif simbolo == 'initializer':
             tipoValor = p[i]
+            tieneValor = True
+        elif simbolo == 'MUT':
+            mutable = True
     reglaAsignacion4(nombre, tipoValor)
-    tabla_simbolos["variables"][nombre] = tipoDeclarado if tipoDeclarado is not None else tipoValor
+    declararVariable(nombre, mutable, tipoDeclarado, tieneValor, tipoValor, p.lineno(1))
 
 def p_constant_declaration(p):
     'constant_declaration : CONSTANT ident COLON data_type EQUAL expression SEMICOLON'
-    tabla_simbolos["constantes"][p[2]] = p[4]  # Semantico (Jared). Aqui se guarda el tipo de la constante
+    declararConstante(p[2], p[4], p[6], p.lineno(1)) # Semantico (Jared / Josue). Aqui se guarda el tipo de la constante
 
 def p_data_type(p):
     '''data_type : TYPE_I8
@@ -160,11 +164,12 @@ def p_parameter(p):
                  | MUT ident COLON data_type'''
     # Semantico (Jared). Aqui el parametro entra a la tabla de simbolos con su tipo
     tabla_simbolos["variables"][p[len(p) - 3]] = p[len(p) - 1]
+    tabla_simbolos["mutabilidad"].pop(p[len(p) - 3], None) # Semantico (Josue)
 
 def p_function_call(p):
     '''function_call : IDENTIFIER PARENL PARENR
                      | IDENTIFIER PARENL arguments PARENR'''
-    p[0] = tabla_simbolos["funciones"].get(p[1])  # Semantico (Jared). Aqui se obtiene el tipo que devuelve la funcion
+    p[0] = tipoLlamada(p[1])  # Semantico (Jared / Josue). Aqui se obtiene el tipo que devuelve la funcion
 
 def p_arguments(p):
     '''arguments : expression
@@ -195,13 +200,16 @@ def p_loop_statement(p):
 def p_struct_definition(p):
     '''struct_definition : STRUCT IDENTIFIER BRACEL struct_fields BRACER
                          | STRUCT IDENTIFIER BRACEL struct_fields COMMA BRACER'''
+    definirStruct(p[2], p[4]) # Semantico (Josue)
 
 def p_struct_fields(p):
     '''struct_fields : struct_field
                      | struct_fields COMMA struct_field'''
+    p[0] = [p[1]] if len(p) == 2 else p[1] + [p[3]] # Semantico (Josue)
 
 def p_struct_field(p):
     'struct_field : IDENTIFIER COLON data_type'
+    p[0] = (p[1], p[3]) # Semantico (Josue)
 
 def p_initializer(p):
     '''initializer : expression
@@ -210,13 +218,17 @@ def p_initializer(p):
 
 def p_struct_instance(p):
     'struct_instance : IDENTIFIER BRACEL field_values BRACER'
+    verificarCamposStruct(p[1], p[3])
+    p[0] = p[1] # Semantico (Josue)
 
 def p_field_values(p):
     '''field_values : field_value
                     | field_values COMMA field_value'''
+    p[0] = [p[1]] if len(p) == 2 else p[1] + [p[3]] # Semantico (Josue)
 
 def p_field_value(p):
     'field_value : IDENTIFIER COLON expression'
+    p[0] = (p[1], p[3], p.lineno(1)) # Semantico (Josue)
 
 def p_enum_definition(p):
     '''enum_definition : ENUM IDENTIFIER BRACEL enum_variants BRACER
@@ -304,6 +316,7 @@ def p_assignment_compound(p):
                   | ident TIMES_EQUAL expression SEMICOLON
                   | ident DIV_EQUAL expression SEMICOLON
                   | ident MOD_EQUAL expression SEMICOLON'''
+    verificarAsignacion(p[1], p[2], p[3], p.lineno(2)) # Semántico (Josue)
 
 # for con rango o coleccion
 # Semantico (Jared). Aqui la cabecera del for es una regla propia para contar el ciclo antes de leer el cuerpo
@@ -326,6 +339,7 @@ def p_for_variable(p):
                     | UNDERSCORE'''
     if p.slice[1].type == 'ident':
         tabla_simbolos["variables"][p[1]] = None  # Semantico (Jared). Aqui la variable del for existe, su tipo no se conoce
+        tabla_simbolos["mutabilidad"].pop(p[1], None) # Semantico (Josue)
 
 # Un rango (a..b) o cualquier expresión que sea una colección
 def p_for_iterable(p):
@@ -451,6 +465,7 @@ def reglaRetorno6(funcion):
 def p_assignment(p):
     'assignment : ident EQUAL expression SEMICOLON'
     reglaAsignacion4(p[1], p[3])
+    verificarAsignacion(p[1], '=', p[3], p.lineno(2)) # Semántico (Josue)
 
 # 2. Condicionales
 # La condicion es una 'expression'
