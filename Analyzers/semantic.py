@@ -8,6 +8,9 @@ tabla_simbolos = {
     "constantes": {},
     "structs": {}, # nombre -> {campo: tipo}
     "mutabilidad": {}, # nombre -> 'mut', 'inmut' o 'sin_valor' (let sin valor inicial)
+    # Semantico (David). Pila de ambitos: cada ambito es {"nombre": ..., "simbolos": {nombre: ficha}}
+    # El primero siempre es el global y nunca se quita
+    "ambitos": [{"nombre": "global", "simbolos": {}}],
 }
 
 # Funcion actual y cantidad de ciclos abiertos
@@ -32,6 +35,7 @@ def reiniciarSemantica():
     pila_funciones.clear()
     tabla_simbolos["structs"].clear()
     tabla_simbolos["mutabilidad"].clear()
+    reiniciarAmbitos()  
 
 
 def agregarErrorSemantico(linea, mensaje, prefijo="Error semántico"):
@@ -227,8 +231,9 @@ def declararVariable(nombre, mutable, tipoDeclarado, tieneValor, tipoValor, line
 
 def declararConstante(nombre, tipoDeclarado, tipoValor, linea):
     verificarTipoAsignado(nombre, tipoDeclarado, tipoValor, linea, 'declaración')
-    tabla_simbolos["constantes"][nombre] = tipoDeclarado
 
+    if verificarConstanteDeclarada(nombre, linea):
+        tabla_simbolos["constantes"][nombre] = tipoDeclarado
 
 # Operador: '=', '+=', '-=', '*=', '/=' o '%='
 def verificarAsignacion(nombre, operador, tipoValor, linea):
@@ -260,3 +265,61 @@ def verificarCamposStruct(nombreStruct, campos):
                                      f"de tipo '{nombreParaMensaje(esperado)}', pero se asignó '{nombreParaMensaje(tipo)}'")
 
 # Fin parte de Josue Sanchez Calderon ////////////////////////////////////////////////////////////
+
+# Inicio parte de Leiner David Saltos Penafiel ///////////////////////////////////////////////////
+
+# La pila de ambitos esta en tabla_simbolos["ambitos"] (arriba, junto al resto de la tabla)
+
+historial_simbolos = []
+
+def crearFicha(nombre, tipo, estado, inicializada, linea):
+    return {
+        "nombre": nombre,
+        "tipo": tipo,
+        "estado": estado,
+        "inicializada": inicializada,
+        "ambito": None,
+        "linea": linea,
+    }
+
+
+def abrirAmbito(nombre):
+    tabla_simbolos["ambitos"].append({"nombre": nombre, "simbolos": {}})
+
+def cerrarAmbito():
+    if len(tabla_simbolos["ambitos"]) > 1:
+        ambito = tabla_simbolos["ambitos"].pop()
+        historial_simbolos.extend(ambito["simbolos"].values())
+
+def textoAmbitoActual():
+    return " > ".join(ambito["nombre"] for ambito in tabla_simbolos["ambitos"])
+
+
+def declararSimbolo(ficha):
+    ficha["ambito"] = textoAmbitoActual()
+    tabla_simbolos["ambitos"][-1]["simbolos"][ficha["nombre"]] = ficha
+
+def buscarSimbolo(nombre):
+    for ambito in reversed(tabla_simbolos["ambitos"]):
+        if nombre in ambito["simbolos"]:
+            return ambito["simbolos"][nombre]
+    return None
+
+def existioAntes(nombre):
+    return any(ficha["nombre"] == nombre for ficha in historial_simbolos)
+
+
+def reiniciarAmbitos():
+    tabla_simbolos["ambitos"].clear()
+    tabla_simbolos["ambitos"].append({"nombre": "global", "simbolos": {}})
+    historial_simbolos.clear()
+
+# Regla 4
+def verificarConstanteDeclarada(nombre, linea):
+    if nombre in tabla_simbolos["constantes"]:
+        agregarErrorSemantico(linea, f"la constante '{nombre}' ya fue declarada en este ámbito")
+        return False
+    return True
+
+
+# Fin parte de Leiner David Saltos Penafiel ///////////////////////////////////////////////////
