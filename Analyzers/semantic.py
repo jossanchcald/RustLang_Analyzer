@@ -115,7 +115,7 @@ def aritmetica(a, b):
     if ca == 'cadena' and cb == 'cadena':
         return 'String'
     if ca == cb and ca in ('entero', 'decimal'):
-        return b if a in ('int', 'float') else a
+        return str(b) if a in ('int', 'float') else str(a)
     return None
 
 
@@ -228,7 +228,7 @@ def declararVariable(nombre, mutable, tipoDeclarado, tieneValor, tipoValor, line
     if tipoDeclarado is not None and tieneValor:
         verificarTipoAsignado(nombre, tipoDeclarado, tipoValor, linea, 'declaración', columna)
 
-    if isinstance(tipoValor, TipoLlamada):
+    if isinstance(tipoValor, (TipoLlamada, TipoNegativo)):
         tipoValor = str(tipoValor)
     # pila de ámbitos (Leiner)
     tipo = tipoDeclarado if tipoDeclarado is not None else tipoValor
@@ -304,6 +304,106 @@ def terminarIf():
         for ficha, estadoThen in entrada["then"]:
             if estadoThen == 'inmut' and ficha["estado"] == 'sin_valor':
                 ficha["estado"] = 'inmut'
+
+# Verificaciones de operaciones
+ENTEROS_CON_SIGNO = {'i8', 'i16', 'i32', 'i64', 'i128', 'isize'}
+ENTEROS_SIN_SIGNO = ENTEROS - ENTEROS_CON_SIGNO
+CLASE_CON_ARTICULO = {'entero': 'un entero', 'decimal': 'un decimal', 'bool': 'un booleano',
+                      'char': 'un carácter', 'cadena': 'una cadena'}
+CLASE_COMO_VALOR = {'entero': 'entero', 'decimal': 'decimal', 'bool': 'bool',
+                    'char': 'carácter', 'cadena': 'cadena'}
+
+# Un entero con signo menos delante (-5). Sirve para rechazar indices negativos
+class TipoNegativo(str):
+    pass
+
+def tipoNegado(tipo):
+    if tipo is None:
+        return None
+    return TipoNegativo('int') if tipo == 'int' else str(tipo)
+
+# Verificacion de + - * / %
+def verificarOperacionAritmetica(operador, izq, der, linea):
+    ci, cd = claseDeTipo(izq), claseDeTipo(der)
+    if ci is None or cd is None:
+        return
+    if operador == '+' and ci == 'cadena':
+        valida = izq == 'String' and der in ('str', '&String')
+    else:
+        valida = ci == cd and ci in ('entero', 'decimal') and tiposCompatibles(izq, der)
+    if not valida:
+        agregarErrorSemantico(linea, f"operación '{operador}' inválida entre los tipos "
+                                     f"'{nombreParaMensaje(izq)}' y '{nombreParaMensaje(der)}'")
+
+# Verificacion de && y ||
+def verificarOperadorLogico(operador, izq, der, linea):
+    for tipo in (izq, der):
+        clase = claseDeTipo(tipo)
+        if clase is not None and clase != 'bool':
+            agregarErrorSemantico(linea, f"el operador '{operador}' requiere operandos bool; "
+                                         f"se encontró un valor {CLASE_COMO_VALOR[clase]}")
+
+# Verificacion de == != < > <= >=
+def verificarComparacion(operador, izq, der, linea):
+    ci, cd = claseDeTipo(izq), claseDeTipo(der)
+    if ci is None or cd is None:
+        return
+    if ci != cd:
+        agregarErrorSemantico(linea, f"no se puede comparar {CLASE_CON_ARTICULO[ci]} con "
+                                     f"{CLASE_CON_ARTICULO[cd]} mediante el operador '{operador}'")
+        return
+    # misma clase: los tipos concretos tambien deben coincidir (i32 con i64 no)
+    if ci in ('entero', 'decimal'):
+        compatibles = tiposCompatibles(izq, der)
+    elif ci == 'cadena':
+        compatibles = operador in ('==', '!=') or izq == der
+    else:
+        compatibles = True
+    if not compatibles:
+        agregarErrorSemantico(linea, f"no se puede comparar un valor de tipo '{nombreParaMensaje(izq)}' con un valor "
+                                     f"de tipo '{nombreParaMensaje(der)}' mediante el operador '{operador}'")
+
+# Verificacion de negacion unaria
+def verificarNegacion(tipo, linea):
+    clase = claseDeTipo(tipo)
+    if clase is None:
+        return
+    if tipo in ENTEROS_SIN_SIGNO:
+        agregarErrorSemantico(linea, f"no se puede aplicar el operador unario '-' a un valor sin signo de tipo '{tipo}'")
+    elif clase in ('bool', 'cadena', 'char'):
+        agregarErrorSemantico(linea, f"no se puede aplicar el operador unario '-' a un valor de tipo '{nombreParaMensaje(tipo)}'")
+
+# Verificacion de arreglo[indice]. Devuelve el tipo del elemento (None si no se conoce)
+def verificarIndice(base, indice, linea):
+    elemento = None
+    if isinstance(base, tuple) and base and base[0] == 'array':
+        elemento = base[1]
+    elif base != 'Vec':
+        if claseDeTipo(base) is not None or base in ('tuple', 'unit'):
+            agregarErrorSemantico(linea, f"solo se permite acceder por índice a arreglos o vectores; "
+                                         f"se encontró un valor de tipo '{nombreParaMensaje(base)}'")
+        return None          # base desconocida o HashMap, struct...: no se revisa
+    if claseDeTipo(indice) is None:
+        return elemento
+    if isinstance(indice, TipoNegativo):
+        encontrado = "un valor negativo"
+    elif indice == 'usize' or indice == 'int':
+        return elemento
+    else:
+        encontrado = f"'{nombreParaMensaje(indice)}'"
+    agregarErrorSemantico(linea, f"los índices de un arreglo deben ser de tipo entero sin signo ('usize'); se encontró {encontrado}")
+    return elemento
+
+# Regla for ... in, lo que vaya despues de 'in' debe ser un rango o una estructura iterable
+def verificarIterable(esRango, tipo, tipoFin, linea):
+    if esRango:
+        # un rango necesita extremos enteros o char (si son floats no es iterable en Rust)
+        invalido = any(claseDeTipo(t) in ('decimal', 'bool', 'cadena') for t in (tipo, tipoFin))
+    else:
+        # un valor suelto solo sirve si es arreglo, Vec o algo desconocido
+        invalido = claseDeTipo(tipo) is not None or tipo in ('tuple', 'unit')
+    if invalido:
+        agregarErrorSemantico(linea, "el 'for' requiere un rango o una estructura iterable")
 
 # Fin parte de Josue Sanchez Calderon ////////////////////////////////////////////////////////////
 

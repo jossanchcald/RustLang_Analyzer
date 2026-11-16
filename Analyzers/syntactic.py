@@ -63,7 +63,7 @@ precedence = (
     ('left', 'MULT', 'DIV', 'MOD'),
     ('left', 'AS'),
     ('right', 'UMINUS', 'UNOT'), # tokens ficticios, para %prec
-    ('left', 'PERIOD'), # llamada a método, es más importante (-a.abs() es -(a.abs()))
+    ('left', 'PERIOD', 'BRACKL'), # llamada a método e indice: son lo mas fuerte (-a[0] es -(a[0]))
 )
 
 def p_variable_declaration(p):
@@ -300,6 +300,7 @@ def p_expression_arithmetic(p):
                   | expression MULT expression
                   | expression DIV expression
                   | expression MOD expression'''
+    verificarOperacionAritmetica(p[2], p[1], p[3], p.lineno(2))  # Semantico (Josue)
     p[0] = aritmetica(p[1], p[3])  # Semantico (Jared). Aqui el tipo del resultado
 
 def p_expression_comparison(p):
@@ -309,16 +310,19 @@ def p_expression_comparison(p):
                   | expression GREATER_THAN expression
                   | expression LESS_EQUAL_THAN expression
                   | expression GREATER_EQUAL_THAN expression'''
+    verificarComparacion(p[2], p[1], p[3], p.lineno(2))  # Semantico (Josue)
     p[0] = 'bool'  # Semantico (Jared)
 
 def p_expression_logical(p):
     '''expression : expression AND expression
                   | expression OR expression'''
+    verificarOperadorLogico(p[2], p[1], p[3], p.lineno(2))  # Semantico (Josue)
     p[0] = 'bool'  # Semantico (Jared)
 
 def p_expression_unary_minus(p):
     'expression : MINUS expression %prec UMINUS'
-    p[0] = p[2]  # Semantico (Jared)
+    verificarNegacion(p[2], p.lineno(1))  # Semantico (Josue)
+    p[0] = tipoNegado(p[2])  # Semantico (Jared)
 
 def p_expression_not(p):
     'expression : NOT expression %prec UNOT'
@@ -332,6 +336,11 @@ def p_expression_cast(p):
 def p_expression_group(p):
     'expression : PARENL expression PARENR'
     p[0] = p[2]
+
+# Acceso por indice: arreglo[i], vector[i]
+def p_expression_index(p):
+    'expression : expression BRACKL expression BRACKR'
+    p[0] = verificarIndice(p[1], p[3], p.lineno(2))  # Semantico (Josue)
 
 # += -= *=
 def p_assignment_compound(p):
@@ -351,6 +360,7 @@ def p_for_statement(p):
 
 def p_for_header(p):
     'for_header : FOR for_variable IN for_iterable'
+    verificarIterable(p[4][0], p[4][1], p[4][2], p.lineno(1))  # Semantico (Josue)
     entrarCiclo()
     abrirAmbitoFor()  # Usado en pila de ámbitos (Leiner)
 
@@ -374,6 +384,7 @@ def p_for_iterable(p):
     '''for_iterable : expression
                     | expression RANGE expression
                     | expression RANGE_INCLUSIVE expression'''
+    p[0] = (len(p) == 4, p[1], p[3] if len(p) == 4 else None)  # Semantico (Josue): (es_rango, tipo, tipo_final)
 
 # Llamadas a métodos v.iter(), x.to_string(), v.push(1)
 def p_method_call(p):
