@@ -25,11 +25,11 @@ fn principal() -> i32 {
 fn main() {
     let mut contador = 0;
     let limite: i32 = 5;
-    let total: i32;
-    let activo = true;
+    let mut total: i32;
+    let mut activo = true;
 
     // Estructuras de datos: arreglos y tuplas
-    let numeros = [10, 20, 30];
+    let mut numeros = [10, 20, 30];
     let ceros = [0; 5];
     let matriz = [[1, 2], [3, 4]];
     let persona = ("Carlos", 20, 1.75);

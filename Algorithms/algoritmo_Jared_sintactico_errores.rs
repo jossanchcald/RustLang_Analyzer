@@ -2,7 +2,7 @@
 // Casos con errores sintacticos de la parte de Jared. Entre cada error hay sentencias validas
 fn main() {
     let mut contador = 0;
-    let limite = 5;
+    let mut limite = 5;
 
     // Error 1: if sin condicion
     if { contador = 1; }

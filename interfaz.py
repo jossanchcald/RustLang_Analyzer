@@ -16,20 +16,6 @@ NOMBRE_LOG = "interfaz"  # nombre que llevan los logs generados desde la interfa
 LOGS = CARPETA / "Logs"
 ALTO_GATITO = 72  # alto maximo (en pixeles) de las imagenes de la carpeta Imagenes/gatitos
 
-CODIGO_INICIAL = """const MAX: u32 = 10;
-const MAX: u32 = 20;
-
-fn main() {
-    let edad: i32 = "veinte";
-    let x = 5
-    let y = 4 @ 2;
-    if x {
-        println!("hola");
-    }
-    despedir();
-}
-"""
-
 # Colores de la interfaz
 FONDO = "#fde6ee"
 PUNTOS = "#f7c4d6"
@@ -119,6 +105,10 @@ def analizar(codigo):
     lexer.begin('INITIAL')
     lexer.lineno = 1
     parser.parse(codigo, lexer=lexer, tracking=True)
+    # Si el programa quedo incompleto (por ejemplo, un comentario sin cerrar), el parser no llega a la regla
+    # inicial y las variables y funciones pendientes no se revisan; aqui se revisan siempre
+    semantic.verificarUsosPendientes()
+    semantic.verificarLlamadasPendientes()
     for texto in syntacticErrors:
         linea, columna, mensaje = mensajeSintactico(texto, lineas)
         errores.append({"categoria": "Sintáctico", "linea": linea, "columna": columna, "mensaje": mensaje})
@@ -132,7 +122,8 @@ def analizar(codigo):
         numero = error["linea"]
         error["fragmento"] = lineas[numero - 1].strip() if numero and numero <= len(lineas) else ""
 
-    return errores, tablaSimbolos(tokens), hora
+    filasTokens = [(t.type, str(t.value), t.lineno, findColumn(codigo, t.lexpos)) for t in tokens]
+    return errores, tablaSimbolos(tokens), hora, filasTokens
 
 
 def guardarLogs(codigo, tokens, erroresLexicos):
@@ -350,8 +341,8 @@ class Interfaz(tk.Tk):
         self.cargarImagenes()
         self.construirCabecera()
         self.construirCuerpo()
-        self.editor.poner(CODIGO_INICIAL)
-        self.after(150, self.analizarCodigo)
+        self.analizado = False
+        self.mostrarDiagnostico()
 
     def estilos(self):
         estilo = ttk.Style(self)
@@ -395,7 +386,7 @@ class Interfaz(tk.Tk):
         self.gato = None
         self.lienzoGato.bind("<Configure>", self.ubicarGato)
         self.boton(derecha, "Abrir archivo", self.abrirArchivo).pack(side="left", padx=4)
-        self.botonEjemplos = self.boton(derecha, "Ejemplos", self.mostrarEjemplos)
+        self.botonEjemplos = self.boton(derecha, "Algoritmos", self.mostrarEjemplos)
         self.botonEjemplos.pack(side="left", padx=4)
         self.boton(derecha, "Limpiar", self.limpiar).pack(side="left", padx=4)
         self.boton(derecha, "▶ Analizar código", self.analizarCodigo, principal=True).pack(side="left", padx=(4, 0))
@@ -410,19 +401,28 @@ class Interfaz(tk.Tk):
         self.editor = Editor(self.tarjetaEditor.cuerpo, self.fuentes["codigo"])
         self.editor.pack(fill="both", expand=True)
 
-        tarjetaTabla = Tarjeta(cuerpo, "3. Tabla de símbolos", fuentes=self.fuentes)
+        tarjetaTabla = Tarjeta(cuerpo, "3. Tabla de símbolos y tokens", fuentes=self.fuentes)
         self.avisoLogs = tk.Label(tarjetaTabla.derecha, text="", bg=TARJETA, fg=TEXTO_SUAVE, font=self.fuentes["pequena"])
         self.avisoLogs.pack()
-        columnas = ("NOMBRE", "TIPO", "MUTABLE", "ÁMBITO", "LÍNEA")
-        self.tabla = ttk.Treeview(tarjetaTabla.cuerpo, columns=columnas, show="headings", selectmode="browse")
-        for columna, ancho in zip(columnas, (150, 150, 90, 170, 60)):
-            self.tabla.heading(columna, text=columna, anchor="w")
-            self.tabla.column(columna, width=ancho, anchor="w")
-        barraTabla = ttk.Scrollbar(tarjetaTabla.cuerpo, orient="vertical", command=self.tabla.yview)
-        self.tabla.configure(yscrollcommand=barraTabla.set)
-        self.tabla.pack(side="left", fill="both", expand=True, padx=(10, 0), pady=6)
-        barraTabla.pack(side="right", fill="y")
-        self.tabla.bind("<<TreeviewSelect>>", self.alElegirSimbolo)
+        # Dos vistas en el mismo panel: la tabla de simbolos y la lista de tokens del analizador lexico
+        selector = tk.Frame(tarjetaTabla.cuerpo, bg=TARJETA)
+        selector.pack(fill="x", padx=10, pady=(8, 0))
+        self.botonesVista = {}
+        for nombre in ("Símbolos", "Tokens"):
+            boton = tk.Button(selector, text=nombre, command=lambda n=nombre: self.cambiarVista(n), relief="flat",
+                              font=self.fuentes["normal"], padx=10, pady=3, cursor="hand2", highlightthickness=1,
+                              borderwidth=0)
+            boton.pack(side="left", padx=(0, 6))
+            self.botonesVista[nombre] = boton
+        self.vistas = {}
+        self.tabla = self.crearTabla(tarjetaTabla.cuerpo, "Símbolos", ("NOMBRE", "TIPO", "MUTABLE", "ÁMBITO", "LÍNEA"),
+                                     (150, 150, 90, 170, 60))
+        self.tablaTokens = self.crearTabla(tarjetaTabla.cuerpo, "Tokens", ("TOKEN", "LEXEMA", "LÍNEA", "COLUMNA"),
+                                           (190, 230, 70, 80))
+        self.tabla.bind("<<TreeviewSelect>>", lambda e: self.alElegirFila(self.tabla, 4))
+        self.tablaTokens.bind("<<TreeviewSelect>>", lambda e: self.alElegirFila(self.tablaTokens, 2))
+        self.vista = "Símbolos"
+        self.cambiarVista("Símbolos")
 
         tarjetaDiagnostico = Tarjeta(cuerpo, "2. Diagnóstico", fuentes=self.fuentes)
         self.contador = tk.Label(tarjetaDiagnostico.derecha, text="", bg=ROJO_SUAVE, fg=ROJO,
@@ -535,26 +535,68 @@ class Interfaz(tk.Tk):
         self.tarjetaEditor.titulo.configure(text=f"1. Editor de código · {self.archivo}")
         self.analizarCodigo()
 
+    def crearTabla(self, padre, nombre, columnas, anchos):
+        marco = tk.Frame(padre, bg=TARJETA)
+        tabla = ttk.Treeview(marco, columns=columnas, show="headings", selectmode="browse")
+        for columna, ancho in zip(columnas, anchos):
+            tabla.heading(columna, text=columna, anchor="w")
+            tabla.column(columna, width=ancho, anchor="w")
+        barra = ttk.Scrollbar(marco, orient="vertical", command=tabla.yview)
+        tabla.configure(yscrollcommand=barra.set)
+        tabla.pack(side="left", fill="both", expand=True, padx=(10, 0), pady=6)
+        barra.pack(side="right", fill="y")
+        self.vistas[nombre] = marco
+        return tabla
+
+    def cambiarVista(self, nombre):
+        self.vista = nombre
+        for clave, marco in self.vistas.items():
+            if clave == nombre:
+                marco.pack(fill="both", expand=True)
+            else:
+                marco.pack_forget()
+        cantidades = {"Símbolos": len(self.tabla.get_children()), "Tokens": len(self.tablaTokens.get_children())}
+        for clave, boton in self.botonesVista.items():
+            activo = clave == nombre
+            boton.configure(text=f"{clave} · {cantidades[clave]}", bg=ACENTO if activo else TARJETA,
+                            fg=ACENTO_TEXTO if activo else TEXTO, activebackground=ACENTO,
+                            highlightbackground=ACENTO if activo else BORDE)
+
     def limpiar(self):
         self.editor.poner("")
         self.archivo = "programa.rs"
         self.tarjetaEditor.titulo.configure(text="1. Editor de código · programa.rs")
         self.errores = []
+        self.analizado = False
         self.tabla.delete(*self.tabla.get_children())
+        self.tablaTokens.delete(*self.tablaTokens.get_children())
+        self.avisoLogs.configure(text="")
+        self.cambiarVista(self.vista)
         self.mostrarDiagnostico()
+        if self.gato is not None:
+            self.gato.dibujar("abiertos")
 
     def analizarCodigo(self):
         codigo = self.editor.obtener()
+        if not codigo.strip():
+            self.limpiar()
+            return
+        self.analizado = True
         try:
-            self.errores, simbolos, hora = analizar(codigo)
+            self.errores, simbolos, hora, filasTokens = analizar(codigo)
             self.avisoLogs.configure(text=f"Logs guardados en Logs/ ({hora})")
         except Exception as error:
-            self.errores, simbolos = [{"categoria": "Sintáctico", "linea": None, "columna": None,
-                                       "mensaje": f"no se pudo completar el análisis ({error})", "fragmento": ""}], []
+            self.errores, simbolos, filasTokens = [{"categoria": "Sintáctico", "linea": None, "columna": None,
+                                                    "mensaje": f"no se pudo completar el análisis ({error})",
+                                                    "fragmento": ""}], [], []
         self.editor.marcarErrores(self.errores)
         self.tabla.delete(*self.tabla.get_children())
         for fila in simbolos:
             self.tabla.insert("", "end", values=fila)
+        self.tablaTokens.delete(*self.tablaTokens.get_children())
+        for fila in filasTokens:
+            self.tablaTokens.insert("", "end", values=fila)
+        self.cambiarVista(self.vista)
         self.mostrarDiagnostico()
         if self.gato is not None:
             self.gato.golpear(alTerminar=lambda: self.gato.reaccionar(bool(self.errores)))
@@ -562,7 +604,9 @@ class Interfaz(tk.Tk):
     # Panel de diagnostico
     def mostrarDiagnostico(self):
         total = len(self.errores)
-        if total:
+        if not self.analizado:
+            self.contador.configure(text="sin analizar", bg=CODIGO_FONDO, fg=TEXTO_SUAVE)
+        elif total:
             self.contador.configure(text=f"{total} error" + ("es" if total != 1 else ""), bg=ROJO_SUAVE, fg=ROJO)
         else:
             self.contador.configure(text="sin errores", bg=ACENTO, fg=ACENTO_TEXTO)
@@ -583,9 +627,14 @@ class Interfaz(tk.Tk):
         if not visibles:
             dibujo = tk.Canvas(self.lista.interior, width=260, height=130, bg=TARJETA, highlightthickness=0)
             dibujo.pack(pady=(24, 4))
-            gatitos.gatoSentado(dibujo, 130, 122, 0.95, "crema", "felices")
-            tk.Label(self.lista.interior, text="No hay errores en esta categoría." if total else
-                     "¡Todo en orden! El código no tiene errores.",
+            gatitos.gatoSentado(dibujo, 130, 122, 0.95, "crema", "felices" if self.analizado else "abiertos")
+            if not self.analizado:
+                texto = "Escribe tu código o abre uno desde Algoritmos,\ny presiona Analizar código."
+            elif total:
+                texto = "No hay errores en esta categoría."
+            else:
+                texto = "¡Todo en orden! El código no tiene errores."
+            tk.Label(self.lista.interior, text=texto, justify="center",
                      bg=TARJETA, fg=TEXTO_SUAVE, font=self.fuentes["normal"]).pack(pady=(0, 12))
         for error in visibles:
             self.tarjetaError(error)
@@ -626,10 +675,10 @@ class Interfaz(tk.Tk):
             for pieza in piezas + fila.winfo_children():
                 pieza.bind("<Button-1>", lambda e, l=error["linea"]: self.editor.irALinea(l))
 
-    def alElegirSimbolo(self, _evento):
-        seleccion = self.tabla.selection()
+    def alElegirFila(self, tabla, posicionLinea):
+        seleccion = tabla.selection()
         if seleccion:
-            linea = self.tabla.item(seleccion[0], "values")[4]
+            linea = tabla.item(seleccion[0], "values")[posicionLinea]
             if str(linea).isdigit():
                 self.editor.irALinea(int(linea))
 

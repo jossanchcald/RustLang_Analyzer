@@ -55,6 +55,8 @@ def p_statement(p):
 
 # Precedencia en las operaciones - Josue Sanchez
 precedence = (
+    ('nonassoc', 'LLAMADA'),
+    ('nonassoc', 'SEMICOLON'),
     ('nonassoc', 'CLOSURE'), # el cuerpo de un closure abarca toda la expresión que sigue
     ('left', 'OR'),
     ('left', 'AND'),
@@ -154,7 +156,7 @@ def p_expression_ident(p):
     p[0] = buscarVariable(p[1])  # Semantico (Jared). Aqui el tipo de la variable segun la tabla de simbolos
 
 def p_expression_call(p):
-    'expression : function_call'
+    'expression : function_call %prec LLAMADA'
     p[0] = p[1]
 
 
@@ -393,7 +395,7 @@ def p_method_call(p):
     p[0] = METODOS_CONOCIDOS.get(p[3])  # Semantico (Jared). Aqui solo se conoce el tipo de algunos metodos (len, to_string)
 
 def p_expression_method(p):
-    'expression : method_call'
+    'expression : method_call %prec LLAMADA'
     p[0] = p[1]
 
 # vec![1, 2, 3], vec![0; 10], vec![]
@@ -453,60 +455,64 @@ def addSyntacticError(p, index, message):
 # ---------------------------------------------------------------------------------------------
 
 # Regla Control 1 (Jared). Aqui la condicion de if / else if / while debe ser de tipo bool
-def reglaControl1(palabra, tipo, linea):
+def reglaControl1(palabra, tipo, linea, columna=None):
     if tipo is not None and claseDeTipo(tipo) not in (None, 'bool'):
-        agregarErrorSemantico(linea, f"la condición de {palabra} debe ser de tipo bool, pero se recibió {nombreDeTipo(tipo)}")
+        agregarErrorSemantico(linea, f"la condición de {palabra} debe ser de tipo bool, pero se recibió {nombreDeTipo(tipo)}",
+                              columna=columna)
 
 # Regla Control 2 (Jared). Aqui else debe ir despues de un if (se llama desde p_error, mas abajo)
-def reglaControl2(linea):
-    agregarErrorSemantico(linea, "la estructura else debe estar precedida por una estructura if")
+def reglaControl2(linea, columna=None):
+    agregarErrorSemantico(linea, "la estructura else debe estar precedida por una estructura if", columna=columna)
 
 # Regla Control 3 (Jared). Aqui break solo puede usarse dentro de un ciclo
-def reglaControl3(linea):
+def reglaControl3(linea, columna=None):
     if contexto["ciclos"] == 0:
-        agregarErrorSemantico(linea, "la instrucción ‘break’ solo puede utilizarse dentro de un ciclo")
+        agregarErrorSemantico(linea, "la instrucción ‘break’ solo puede utilizarse dentro de un ciclo", columna=columna)
 
 # Regla Control 4 (Jared). Aqui la funcion main no puede declarar un tipo de retorno
-def reglaControl4(funcion, tipo, linea):
+def reglaControl4(funcion, tipo, linea, columna=None):
     if funcion["nombre"] == 'main':
-        agregarErrorSemantico(linea, f"el tipo de retorno {nombreDeTipo(tipo)} no es válido para la función ‘main’")
+        agregarErrorSemantico(linea, f"el tipo de retorno {nombreDeTipo(tipo)} no es válido para la función ‘main’", columna=columna)
 
 # Regla Control 5 (Jared). Aqui continue solo puede usarse dentro de un ciclo
-def reglaControl5(linea):
+def reglaControl5(linea, columna=None):
     if contexto["ciclos"] == 0:
-        agregarErrorSemantico(linea, "palabra reservada continue ubicada fuera de bucle")
+        agregarErrorSemantico(linea, "palabra reservada continue ubicada fuera de bucle", columna=columna)
 
 # Regla Asignacion de tipo 4 (Jared). Aqui todos los elementos de un arreglo deben ser del mismo tipo
 def reglaAsignacion4(nombre, tipo):
     if isinstance(tipo, tuple) and len(tipo) > 2 and tipo[2]:
-        linea, esperado, encontrado = tipo[2]
-        agregarErrorSemantico(linea, f"el arreglo ‘{nombre}’ requiere elementos {esperado}; se encontró un valor {encontrado}")
+        linea, esperado, encontrado, columna = tipo[2]
+        agregarErrorSemantico(linea, f"el arreglo ‘{nombre}’ requiere elementos {esperado}; se encontró un valor {encontrado}",
+                              columna=columna)
 
 # Regla Retorno 1 (Jared). Aqui el valor devuelto debe tener el tipo declarado en la funcion
-def reglaRetorno1(tipoActual, tipoDeclarado, linea):
+def reglaRetorno1(tipoActual, tipoDeclarado, linea, columna=None):
     if not tiposCompatibles(tipoActual, tipoDeclarado):
-        agregarErrorSemantico(linea, f"el tipo de retorno {nombreDeTipo(tipoActual)} no coincide con el tipo declarado {nombreDeTipo(tipoDeclarado)}")
+        agregarErrorSemantico(linea, f"el tipo de retorno {nombreDeTipo(tipoActual)} no coincide con el tipo declarado {nombreDeTipo(tipoDeclarado)}",
+                              columna=columna)
 
 # Regla Retorno 2 (Jared). Aqui una funcion con '-> T' debe terminar con una expresion final sin ';'
-def reglaRetorno2(tipoDeclarado, linea):
-    agregarErrorSemantico(linea, f"la función espera un retorno de tipo {nombreDeTipo(tipoDeclarado)}")
+def reglaRetorno2(tipoDeclarado, linea, columna=None):
+    agregarErrorSemantico(linea, f"la función espera un retorno de tipo {nombreDeTipo(tipoDeclarado)}", columna=columna)
 
 # Regla Retorno 3 (Jared). Aqui una funcion sin '->' no puede devolver un valor
-def reglaRetorno3(linea):
-    agregarErrorSemantico(linea, "se retorna valor en una función que no define retorno")
+def reglaRetorno3(linea, columna=None):
+    agregarErrorSemantico(linea, "se retorna valor en una función que no define retorno", columna=columna)
 
 # Regla Retorno 4 (Jared). Aqui return solo puede estar dentro del cuerpo de una funcion
-def reglaRetorno4(linea):
-    agregarErrorSemantico(linea, "la instrucción ‘return’ se encuentra fuera del cuerpo de una función")
+def reglaRetorno4(linea, columna=None):
+    agregarErrorSemantico(linea, "la instrucción ‘return’ se encuentra fuera del cuerpo de una función", columna=columna)
 
 # Regla Retorno 5 (Jared). Aqui con tipo de retorno, todos los caminos deben devolver un valor (if sin else)
 def reglaRetorno5(funcion):
     agregarErrorSemantico(funcion["linea"], f"la función ‘{funcion['nombre']}’ puede finalizar sin devolver un valor de tipo {nombreDeTipo(funcion['ret'])}",
-                          prefijo="Error semántico de retorno")
+                          prefijo="Error semántico de retorno", columna=funcion.get("columna"))
 
 # Regla Retorno 6 (Jared). Aqui en un if / else, las dos ramas deben devolver el tipo declarado
 def reglaRetorno6(funcion):
-    agregarErrorSemantico(funcion["linea"], "la función definida no devuelve un valor en todos los caminos de ejecución")
+    agregarErrorSemantico(funcion["linea"], "la función definida no devuelve un valor en todos los caminos de ejecución",
+                          columna=funcion.get("columna"))
 
 
 # 1. Asignacion simple
@@ -522,7 +528,7 @@ def p_assignment(p):
 # El if deja en p[0] si tiene else y si todas sus ramas devuelven valor (para las reglas de Retorno 5 y 6)
 def p_if_header(p):
     'if_header : IF expression'
-    reglaControl1('if', p[2], p.lineno(1))
+    reglaControl1('if', p[2], p.lineno(1), columnaDe(p, 2))
     iniciarIf()
 
 # Cuando falla la condicion o faltan las llaves, aqui PLY descarta tokens hasta la '{' y sigue desde ahi para que pueda avanzar
@@ -552,7 +558,7 @@ def p_if_statement(p):
 # La cabecera 'while condicion' es una regla propia, asi al reconocerla ya sabemos que lo que sigue esta dentro de un ciclo
 def p_while_header(p):
     'while_header : WHILE expression'
-    reglaControl1('while', p[2], p.lineno(1))
+    reglaControl1('while', p[2], p.lineno(1), columnaDe(p, 2))
     entrarCiclo()
 
 def p_while_error(p):
@@ -568,12 +574,12 @@ def p_while_statement(p):
 def p_break_statement(p):
     '''break_statement : BREAK SEMICOLON
                        | BREAK expression SEMICOLON'''
-    reglaControl3(p.lineno(1))
+    reglaControl3(p.lineno(1), columnaDe(p, 1))
     marcarBreak()
 
 def p_continue_statement(p):
     'continue_statement : CONTINUE SEMICOLON'
-    reglaControl5(p.lineno(1))
+    reglaControl5(p.lineno(1), columnaDe(p, 1))
 
 # 4. Arreglos y Tuplas
 # El arreglo deja en p[0] ('array', tipo_de_sus_elementos, problema); quien lo recibe (let o asignacion) lo revisa
@@ -587,7 +593,7 @@ def p_array_literal(p):
     elif len(p) == 6:
         p[0] = ('array', p[2], None)   # [valor; cantidad]
     else:
-        p[0] = tipoArreglo(p[2], p.lineno(1))
+        p[0] = tipoArreglo(p[2], p.lineno(1), columnaDe(p, 1))
 
 # Tupla: (), (1,), ("Carlos", 20, 1.75)
 def p_tuple_literal(p):
@@ -628,7 +634,7 @@ def p_ret_spec(p):
         funcion["tiene_ret"] = True
         funcion["ret"] = p[2]
         tabla_simbolos["funciones"][funcion["nombre"]] = p[2]
-        reglaControl4(funcion, p[2], p.lineno(1))
+        reglaControl4(funcion, p[2], p.lineno(1), columnaDe(p, 2))
     p[0] = p[2]
 
 # Al terminar el cuerpo se revisan las reglas de Retorno 1, 2, 5 y 6
@@ -639,17 +645,17 @@ def p_function_return(p):
     if funcion is not None:
         tipoDeclarado = funcion["ret"]
         if cuerpo['tiene_cola']:
-            reglaRetorno1(cuerpo['cola_tipo'], tipoDeclarado, cuerpo['linea_cola'])
+            reglaRetorno1(cuerpo['cola_tipo'], tipoDeclarado, cuerpo['linea_cola'], cuerpo['columna_cola'])
         elif not bloqueDevuelve(cuerpo['sentencias']):
             # Ningun camino garantiza un valor, asi que se mira la ultima sentencia para elegir el mensaje
             if cuerpo['cola_semi']:
-                ultima = {'clase': 'expr_semi', 'linea': cuerpo['linea_semi']}
+                ultima = {'clase': 'expr_semi', 'linea': cuerpo['linea_semi'], 'columna': cuerpo['columna_semi']}
             else:
                 ultima = cuerpo['sentencias'][-1] if cuerpo['sentencias'] else None
             if ultima is None:
-                reglaRetorno2(tipoDeclarado, cuerpo['linea_fin'])
+                reglaRetorno2(tipoDeclarado, cuerpo['linea_fin'], cuerpo['columna_fin'])
             elif ultima['clase'] == 'expr_semi':
-                reglaRetorno2(tipoDeclarado, ultima['linea'])
+                reglaRetorno2(tipoDeclarado, ultima['linea'], ultima.get('columna'))
             elif ultima['clase'] == 'if' and ultima['con_else']:
                 reglaRetorno6(funcion)
             else:
@@ -667,16 +673,19 @@ def p_return_block(p):
                     | BRACEL body expression SEMICOLON BRACER'''
     simbolos = [p.slice[i].type for i in range(1, len(p))]
     cuerpo = {'sentencias': [], 'tiene_cola': False, 'cola_tipo': None, 'linea_cola': p.lineno(1),
-              'cola_semi': False, 'linea_semi': p.lineno(1), 'linea_fin': p.lineno(len(p) - 1)}
+              'cola_semi': False, 'linea_semi': p.lineno(1), 'linea_fin': p.lineno(len(p) - 1),
+              'columna_cola': None, 'columna_semi': None, 'columna_fin': columnaDe(p, len(p) - 1)}
     if 'body' in simbolos:
         cuerpo['sentencias'] = p[simbolos.index('body') + 1]
     if 'expression' in simbolos:
         posicion = simbolos.index('expression') + 1
         linea = p.lineno(posicion) or p.lineno(1)
+        columna = columnaDe(p, posicion)
         if 'SEMICOLON' in simbolos:
-            cuerpo['cola_semi'], cuerpo['linea_semi'] = True, linea
+            cuerpo['cola_semi'], cuerpo['linea_semi'], cuerpo['columna_semi'] = True, linea, columna
         else:
             cuerpo['tiene_cola'], cuerpo['cola_tipo'], cuerpo['linea_cola'] = True, p[posicion], linea
+            cuerpo['columna_cola'] = columna
     p[0] = cuerpo
 
 # return; o return expresion;
@@ -685,28 +694,29 @@ def p_return_statement(p):
                         | RETURN expression SEMICOLON'''
     funcion = contexto["funcion"]
     conValor = len(p) == 4
+    columna = columnaDe(p, 1)
     if funcion is None:
-        reglaRetorno4(p.lineno(1))
+        reglaRetorno4(p.lineno(1), columna)
     elif not funcion["tiene_ret"]:
         if conValor:
-            reglaRetorno3(p.lineno(1))
+            reglaRetorno3(p.lineno(1), columna)
     elif not conValor:
-        reglaRetorno2(funcion["ret"], p.lineno(1))
+        reglaRetorno2(funcion["ret"], p.lineno(1), columna)
     else:
-        reglaRetorno1(p[2], funcion["ret"], p.lineno(1))
+        reglaRetorno1(p[2], funcion["ret"], p.lineno(1), columnaDe(p, 2))
     p[0] = {'clase': 'return', 'devuelve': True}
 
 # const X: i32 = return 10;  (se acepta en la gramatica para avisar el error de Retorno 4)
 def p_constant_return(p):
     'constant_declaration : CONSTANT ident COLON data_type EQUAL RETURN expression SEMICOLON'
-    reglaRetorno4(p.lineno(6))
+    reglaRetorno4(p.lineno(6), columnaDe(p, 6))
 
 # Fin parte de Jared Selim Beltran Martinez ///////////////////////////////////////////////////////////////
 
 # Error rule for syntax errors
 def p_error(p):
     if p and p.type == 'ELSE':
-        reglaControl2(p.lineno)  # Semantico (Jared). Aqui un else que no sigue a un if
+        reglaControl2(p.lineno, findColumn(p.lexer.lexdata, p.lexpos))  # Semantico (Jared). Aqui un else que no sigue a un if
     if p:
         column = findColumn(p.lexer.lexdata, p.lexpos)
         mensaje = f"Error de sintaxis en token [{p.type}] -> {p.value} (Línea {p.lineno}, Columna {column})"

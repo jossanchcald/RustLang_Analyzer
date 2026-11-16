@@ -127,7 +127,7 @@ def buscarVariable(nombre):
 
 
 # Devuelve ('array', tipo, problema). problema se llena si un elemento es de otro tipo diferente en el arreglo.
-def tipoArreglo(elementos, linea):
+def tipoArreglo(elementos, linea, columna=None):
     base, problema = None, None
     for tipo in elementos:
         if isinstance(tipo, tuple):
@@ -140,14 +140,14 @@ def tipoArreglo(elementos, linea):
         if base is None:
             base = tipo
         elif problema is None and clase != claseDeTipo(base):
-            problema = (linea, PLURAL_CLASE[claseDeTipo(base)], nombreDeTipo(tipo))
+            problema = (linea, PLURAL_CLASE[claseDeTipo(base)], nombreDeTipo(tipo), columna)
     return ('array', base, problema)
 
 
 def iniciarFuncion(nombre, linea, columna=None):
     verificarFuncionRepetida(nombre, linea, columna)  # Regla Identificadores 6 (Leiner)
     pila_funciones.append((contexto["funcion"], contexto["ciclos"], contexto["breaks"]))
-    contexto["funcion"] = {"nombre": nombre, "linea": linea, "tiene_ret": False, "ret": None}
+    contexto["funcion"] = {"nombre": nombre, "linea": linea, "columna": columna, "tiene_ret": False, "ret": None}
     contexto["ciclos"] = 0
     contexto["breaks"] = []
     tabla_simbolos["funciones"][nombre] = 'unit'
