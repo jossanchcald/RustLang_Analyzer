@@ -1,0 +1,71 @@
+[[[[[ ERRORES SEMÁNTICOS ]]]]]
+Error semántico (línea 26): tipos incompatibles en la declaración de 'edad', tipo esperado 'i32'
+Error semántico (línea 28): tipos incompatibles en la declaración de 'activo', tipo esperado 'bool'
+Error semántico (línea 30): tipos incompatibles en la declaración de 'precio', tipo esperado 'f64'
+Error semántico (línea 32): tipos incompatibles en la declaración de 'cantidad', tipo esperado 'i32'
+Error semántico (línea 34): tipos incompatibles en la declaración de 'nombre', tipo esperado 'String'
+Error semántico (línea 36): tipos incompatibles en la declaración de 'letra', tipo esperado 'char'
+Error semántico (línea 40): tipos incompatibles en la asignación de 'contador', tipo esperado 'i32'
+Error semántico (línea 44): tipos incompatibles en la asignación de 'total', tipo esperado 'i32'
+Error semántico (línea 48): tipos incompatibles en la asignación de 'nombre_m', tipo esperado 'String'
+Error semántico (línea 56): no se puede modificar la constante 'MAX'
+Error semántico (línea 58): no se puede modificar la constante 'PI'
+Error semántico (línea 60): no se puede modificar la constante 'MAX'
+Error semántico (línea 69): no se puede modificar la variable inmutable 'edad_fija'
+Error semántico (línea 73): no se puede modificar la variable inmutable 'saludo_fijo'
+Error semántico (línea 77): no se puede modificar la variable inmutable 'contador_fijo'
+Error semántico (línea 82): no se puede modificar la variable inmutable 'una_vez'
+Error semántico (línea 89): la función 'saludar' devuelve el tipo unitario '()' y no puede asignarse a una variable de tipo 'i32'
+Error semántico (línea 91): la función 'saludar' devuelve el tipo unitario '()' y no puede asignarse a una variable de tipo 'String'
+Error semántico (línea 93): la función 'saludar' devuelve el tipo unitario '()' y no puede asignarse a una variable de tipo 'bool'
+Error semántico (línea 95): la función 'obtener_numero' devuelve el tipo 'i32' y no puede asignarse a una variable de tipo 'String'
+Error semántico (línea 97): la función 'obtener_numero' devuelve el tipo 'i32' y no puede asignarse a una variable de tipo 'bool'
+Error semántico (línea 99): la función 'obtener_texto' devuelve el tipo 'String' y no puede asignarse a una variable de tipo 'i32'
+Error semántico (línea 101): la función 'obtener_numero' devuelve el tipo 'i32' y no puede asignarse a una variable de tipo 'f64'
+Error semántico (línea 109): el campo 'edad' de la estructura 'Persona' espera un valor de tipo 'u32', pero se asignó '&str'
+Error semántico (línea 111): el campo 'nombre' de la estructura 'Persona' espera un valor de tipo 'String', pero se asignó '&str'
+Error semántico (línea 113): el campo 'altura' de la estructura 'Persona' espera un valor de tipo 'f64', pero se asignó '&str'
+Error semántico (línea 115): el campo 'activo' de la estructura 'Persona' espera un valor de tipo 'bool', pero se asignó 'i32'
+Error semántico (línea 117): el campo 'edad' de la estructura 'Persona' espera un valor de tipo 'u32', pero se asignó 'f64'
+Error semántico (línea 125): operación '+' inválida entre los tipos 'i32' y 'f64'
+Error semántico (línea 130): operación '*' inválida entre los tipos 'i32' y 'f64'
+Error semántico (línea 132): operación '-' inválida entre los tipos 'i32' y 'f64'
+Error semántico (línea 134): operación '-' inválida entre los tipos 'bool' y 'i32'
+Error semántico (línea 139): operación '+' inválida entre los tipos 'i32' y 'i64'
+Error semántico (línea 147): operación '+' inválida entre los tipos 'String' y 'i32'
+Error semántico (línea 149): operación '+' inválida entre los tipos '&str' y '&str'
+Error semántico (línea 151): operación '+' inválida entre los tipos 'i32' y '&str'
+Error semántico (línea 153): operación '+' inválida entre los tipos 'String' y 'f64'
+Error semántico (línea 161): el operador '&&' requiere operandos bool; se encontró un valor entero
+Error semántico (línea 163): el operador '||' requiere operandos bool; se encontró un valor entero
+Error semántico (línea 165): el operador '&&' requiere operandos bool; se encontró un valor cadena
+Error semántico (línea 167): el operador '&&' requiere operandos bool; se encontró un valor cadena
+Error semántico (línea 169): el operador '||' requiere operandos bool; se encontró un valor decimal
+Error semántico (línea 178): no se puede comparar un entero con una cadena mediante el operador '<'
+Error semántico (línea 180): no se puede comparar un entero con un booleano mediante el operador '=='
+Error semántico (línea 182): no se puede comparar una cadena con un entero mediante el operador '>'
+Error semántico (línea 184): no se puede comparar un decimal con un carácter mediante el operador '<'
+Error semántico (línea 189): no se puede comparar un valor de tipo 'i32' con un valor de tipo 'i64' mediante el operador '<'
+Error semántico (línea 194): no se puede comparar un valor de tipo 'f32' con un valor de tipo 'f64' mediante el operador '=='
+Error semántico (línea 202): no se puede aplicar el operador unario '-' a un valor sin signo de tipo 'u32'
+Error semántico (línea 206): no se puede aplicar el operador unario '-' a un valor sin signo de tipo 'u8'
+Error semántico (línea 210): no se puede aplicar el operador unario '-' a un valor de tipo 'bool'
+Error semántico (línea 212): no se puede aplicar el operador unario '-' a un valor de tipo '&str'
+Error semántico (línea 214): no se puede aplicar el operador unario '-' a un valor de tipo 'char'
+Error semántico (línea 223): los índices de un arreglo deben ser de tipo entero sin signo ('usize'); se encontró '&str'
+Error semántico (línea 225): los índices de un arreglo deben ser de tipo entero sin signo ('usize'); se encontró 'f64'
+Error semántico (línea 227): los índices de un arreglo deben ser de tipo entero sin signo ('usize'); se encontró 'bool'
+Error semántico (línea 229): los índices de un arreglo deben ser de tipo entero sin signo ('usize'); se encontró un valor negativo
+Error semántico (línea 233): los índices de un arreglo deben ser de tipo entero sin signo ('usize'); se encontró 'i32'
+Error semántico (línea 236): los índices de un arreglo deben ser de tipo entero sin signo ('usize'); se encontró 'u32'
+Error semántico (línea 240): solo se permite acceder por índice a arreglos o vectores; se encontró un valor de tipo 'i32'
+Error semántico (línea 243): solo se permite acceder por índice a arreglos o vectores; se encontró un valor de tipo '&str'
+Error semántico (línea 246): solo se permite acceder por índice a arreglos o vectores; se encontró un valor de tipo 'bool'
+Error semántico (línea 250): los índices de un arreglo deben ser de tipo entero sin signo ('usize'); se encontró 'f64'
+Error semántico (línea 260): el 'for' requiere un rango o una estructura iterable
+Error semántico (línea 266): el 'for' requiere un rango o una estructura iterable
+Error semántico (línea 271): el 'for' requiere un rango o una estructura iterable
+Error semántico (línea 276): el 'for' requiere un rango o una estructura iterable
+Error semántico (línea 281): el 'for' requiere un rango o una estructura iterable
+Error semántico (línea 286): el 'for' requiere un rango o una estructura iterable
+Error semántico (línea 292): el 'for' requiere un rango o una estructura iterable
