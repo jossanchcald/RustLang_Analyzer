@@ -1,13 +1,12 @@
 # Errores semanticos guardados como (linea, texto)
 semanticErrors = []
 
-# Tabla de simbolos: nombre -> tipo
+# Tabla de simbolos
 tabla_simbolos = {
-    "variables": {},
-    "funciones": {}, # 'unit' si no devuelve nada
-    "constantes": {},
+    "funciones": {}, # nombre -> tipo de retorno ('unit' si no devuelve nada)
+    "constantes": {}, # nombre -> tipo
     "structs": {}, # nombre -> {campo: tipo}
-    "mutabilidad": {}, # nombre -> 'mut', 'inmut' o 'sin_valor' (let sin valor inicial)
+    "ambitos": [{"nombre": "global", "simbolos": {}}],
 }
 
 # Funcion actual y cantidad de ciclos abiertos
@@ -23,7 +22,6 @@ METODOS_CONOCIDOS = {'len': 'usize', 'to_string': 'String'}
 
 def reiniciarSemantica():
     semanticErrors.clear()
-    tabla_simbolos["variables"].clear()
     tabla_simbolos["funciones"].clear()
     tabla_simbolos["constantes"].clear()
     contexto["funcion"] = None
@@ -31,11 +29,12 @@ def reiniciarSemantica():
     contexto["breaks"] = []
     pila_funciones.clear()
     tabla_simbolos["structs"].clear()
-    tabla_simbolos["mutabilidad"].clear()
+    reiniciarAmbitos()  # Usado en pila de ámbitos (Leiner)
 
-
-def agregarErrorSemantico(linea, mensaje, prefijo="Error semántico"):
-    item = (linea, f"{prefijo} (línea {linea}): {mensaje}")
+def agregarErrorSemantico(linea, mensaje, prefijo="Error semántico", columna=None):
+    # Usado en mensajes con columna (Leiner)
+    posicion = f"línea {linea}" if columna is None else f"línea {linea}, columna {columna}"
+    item = (linea, f"{prefijo} ({posicion}): {mensaje}")
     if item not in semanticErrors:
         semanticErrors.append(item)
 
@@ -117,8 +116,9 @@ def aritmetica(a, b):
 
 
 def buscarVariable(nombre):
-    if nombre in tabla_simbolos["variables"]:
-        return tabla_simbolos["variables"][nombre]
+    ficha = buscarSimbolo(nombre)  # Usado en pila de ámbitos (Leiner)
+    if ficha is not None:
+        return ficha["tipo"]
     return tabla_simbolos["constantes"].get(nombre)
 
 
@@ -140,12 +140,15 @@ def tipoArreglo(elementos, linea):
     return ('array', base, problema)
 
 
-def iniciarFuncion(nombre, linea):
+def iniciarFuncion(nombre, linea, columna=None):
+    verificarFuncionRepetida(nombre, linea, columna)  # Regla Identificadores 6 (Leiner)
     pila_funciones.append((contexto["funcion"], contexto["ciclos"], contexto["breaks"]))
     contexto["funcion"] = {"nombre": nombre, "linea": linea, "tiene_ret": False, "ret": None}
     contexto["ciclos"] = 0
     contexto["breaks"] = []
     tabla_simbolos["funciones"][nombre] = 'unit'
+    abrirAmbito(nombre)  # pila de ámbitos (Leiner)
+    declararParametrosPendientes()  # pila de ámbitos (Leiner)
 
 
 def terminarFuncion():
@@ -153,7 +156,7 @@ def terminarFuncion():
         contexto["funcion"], contexto["ciclos"], contexto["breaks"] = pila_funciones.pop()
     else:
         contexto["funcion"], contexto["ciclos"], contexto["breaks"] = None, 0, []
-    tabla_simbolos["variables"].clear()
+    cerrarAmbito()  # pila de ámbitos (Leiner)
 
 
 def entrarCiclo():
@@ -196,7 +199,7 @@ def nombreParaMensaje(tipo):
 
 
 # Para las variables, el valor debe tener el tipo que espera la variable
-def verificarTipoAsignado(nombre, esperado, actual, linea, accion):
+def verificarTipoAsignado(nombre, esperado, actual, linea, accion, columna=None):
     if esperado is None or actual is None:
         return
 
@@ -211,36 +214,46 @@ def verificarTipoAsignado(nombre, esperado, actual, linea, accion):
         return
 
     if not tiposCompatibles(actual, esperado):
+        if verificarConversionImplicita(actual, esperado, linea, columna):  # Regla Conversión 1 (Leiner)
+            return
         agregarErrorSemantico(linea, f"tipos incompatibles en la {accion} de '{nombre}', "
                                      f"tipo esperado '{nombreParaMensaje(esperado)}'")
 
 
-def declararVariable(nombre, mutable, tipoDeclarado, tieneValor, tipoValor, linea):
+def declararVariable(nombre, mutable, tipoDeclarado, tieneValor, tipoValor, linea, columna=None):
     if tipoDeclarado is not None and tieneValor:
-        verificarTipoAsignado(nombre, tipoDeclarado, tipoValor, linea, 'declaración')
+        verificarTipoAsignado(nombre, tipoDeclarado, tipoValor, linea, 'declaración', columna)
 
     if isinstance(tipoValor, TipoLlamada):
         tipoValor = str(tipoValor)
-    tabla_simbolos["variables"][nombre] = tipoDeclarado if tipoDeclarado is not None else tipoValor
-    tabla_simbolos["mutabilidad"][nombre] = 'mut' if mutable else ('inmut' if tieneValor else 'sin_valor')
+    # pila de ámbitos (Leiner)
+    tipo = tipoDeclarado if tipoDeclarado is not None else tipoValor
+    estado = 'mut' if mutable else ('inmut' if tieneValor else 'sin_valor')
+    declararSimbolo(crearFicha(nombre, tipo, estado, tieneValor, linea))
 
 
-def declararConstante(nombre, tipoDeclarado, tipoValor, linea):
-    verificarTipoAsignado(nombre, tipoDeclarado, tipoValor, linea, 'declaración')
-    tabla_simbolos["constantes"][nombre] = tipoDeclarado
+def declararConstante(nombre, tipoDeclarado, tipoValor, linea, columna=None):
+    verificarTipoAsignado(nombre, tipoDeclarado, tipoValor, linea, 'declaración', columna)
 
+    if verificarConstanteDeclarada(nombre, linea, columna):
+        tabla_simbolos["constantes"][nombre] = tipoDeclarado
 
 # Operador: '=', '+=', '-=', '*=', '/=' o '%='
-def verificarAsignacion(nombre, operador, tipoValor, linea):
-    if nombre in tabla_simbolos["variables"]:
-        estado = tabla_simbolos["mutabilidad"].get(nombre) # None es parametro o variable de for asi q no se revisa
+def verificarAsignacion(nombre, operador, tipoValor, linea, columna=None):
+    ficha = buscarSimbolo(nombre)  # pila de ámbitos (Leiner)
+    if ficha is not None:
+        estado = ficha["estado"] # None es parametro o variable de for asi q no se revisa
         if estado == 'inmut' or (estado == 'sin_valor' and operador != '='):
             agregarErrorSemantico(linea, f"no se puede modificar la variable inmutable '{nombre}'")
         elif estado == 'sin_valor':
-            tabla_simbolos["mutabilidad"][nombre] = 'inmut' # la primera asignacion si se permite
-        verificarTipoAsignado(nombre, tabla_simbolos["variables"][nombre], tipoValor, linea, 'asignación')
+            ficha["estado"] = 'inmut' # la primera asignacion si se permite
+        verificarInicializadaCompuesta(ficha, operador, linea, columna)  # Regla Identificadores 5 (Leiner)
+        ficha["inicializada"] = True  # Regla Identificadores 5 (Leiner)
+        verificarTipoAsignado(nombre, ficha["tipo"], tipoValor, linea, 'asignación', columna)
     elif nombre in tabla_simbolos["constantes"]:
         agregarErrorSemantico(linea, f"no se puede modificar la constante '{nombre}'")
+    else:
+        verificarUsoVariable(nombre, linea, columna)  # Regla Identificadores 3 (Leiner)
 
 
 def definirStruct(nombre, campos):
@@ -260,3 +273,201 @@ def verificarCamposStruct(nombreStruct, campos):
                                      f"de tipo '{nombreParaMensaje(esperado)}', pero se asignó '{nombreParaMensaje(tipo)}'")
 
 # Fin parte de Josue Sanchez Calderon ////////////////////////////////////////////////////////////
+
+# Inicio parte de Leiner David Saltos Penafiel ///////////////////////////////////////////////////
+
+# Usado en mensajes con columna
+def errorIdentificadores(linea, columna, mensaje):
+    agregarErrorSemantico(linea, mensaje, "Error semántico de identificadores", columna)
+
+def errorConversion(linea, columna, mensaje):
+    agregarErrorSemantico(linea, mensaje, "Error semántico de conversión", columna)
+
+
+# Usado en pila de ámbitos
+historial_simbolos = []
+
+def crearFicha(nombre, tipo, estado, inicializada, linea, columna=None):
+    return {
+        "nombre": nombre,
+        "tipo": tipo,
+        "estado": estado,
+        "inicializada": inicializada,
+        "ambito": None,
+        "linea": linea,
+        "columna": columna,
+    }
+
+
+def abrirAmbito(nombre):
+    tabla_simbolos["ambitos"].append({"nombre": nombre, "simbolos": {}})
+
+def cerrarAmbito():
+    if len(tabla_simbolos["ambitos"]) > 1:
+        ambito = tabla_simbolos["ambitos"].pop()
+        historial_simbolos.extend(ambito["simbolos"].values())
+
+def textoAmbitoActual():
+    return " > ".join(ambito["nombre"] for ambito in tabla_simbolos["ambitos"])
+
+
+def declararSimbolo(ficha):
+    ficha["ambito"] = textoAmbitoActual()
+    tabla_simbolos["ambitos"][-1]["simbolos"][ficha["nombre"]] = ficha
+
+def buscarSimbolo(nombre):
+    for ambito in reversed(tabla_simbolos["ambitos"]):
+        if nombre in ambito["simbolos"]:
+            return ambito["simbolos"][nombre]
+    return None
+
+def existioAntes(nombre):
+    return any(ficha["nombre"] == nombre for ficha in historial_simbolos)
+
+
+def reiniciarAmbitos():
+    tabla_simbolos["ambitos"].clear()
+    tabla_simbolos["ambitos"].append({"nombre": "global", "simbolos": {}})
+    historial_simbolos.clear()
+    parametros_pendientes.clear()
+    variable_for_pendiente.clear()
+    usos_pendientes.clear()
+    llamadas_pendientes.clear()
+
+
+# Usado en parámetros de funciones
+parametros_pendientes = []
+
+def agregarParametroPendiente(nombre, tipo, linea, columna=None):
+    parametros_pendientes.append(crearFicha(nombre, tipo, None, True, linea, columna))
+
+def declararParametrosPendientes():
+    for ficha in parametros_pendientes:
+        # Regla Identificadores 6 (Leiner)
+        if ficha["nombre"] in tabla_simbolos["ambitos"][-1]["simbolos"]:
+            errorIdentificadores(ficha["linea"], ficha["columna"], f"repetición de variables parámetros: '{ficha['nombre']}'")
+            continue
+        declararSimbolo(ficha)
+    parametros_pendientes.clear()
+
+# Usado en recuperación de errores sintácticos
+def descartarParametrosPendientes():
+    parametros_pendientes.clear()
+
+
+# Usado en ámbito del for
+variable_for_pendiente = []
+
+def agregarVariableForPendiente(nombre, linea):
+    variable_for_pendiente.append(crearFicha(nombre, None, None, True, linea))
+
+def abrirAmbitoFor():
+    abrirAmbito("for")
+    for ficha in variable_for_pendiente:
+        declararSimbolo(ficha)
+    variable_for_pendiente.clear()
+
+
+# Regla Identificadores 3 (Leiner)
+usos_pendientes = []
+
+def verificarUsoVariable(nombre, linea, columna=None):
+    ficha = buscarSimbolo(nombre)
+    if ficha is not None:
+        # Regla Identificadores 5 (Leiner)
+        if not ficha["inicializada"]:
+            errorIdentificadores(linea, columna, f"la variable '{nombre}' se utiliza antes de haber sido inicializada")
+        return
+    if nombre in tabla_simbolos["constantes"]:
+        return
+    # Regla Identificadores 1 (Leiner)
+    if existioAntes(nombre):
+        errorIdentificadores(linea, columna, f"la variable '{nombre}' no es visible en este ámbito")
+        return
+    usos_pendientes.append((nombre, linea, columna))
+
+# Regla Identificadores 3 (Leiner)
+def verificarUsosPendientes():
+    for nombre, linea, columna in usos_pendientes:
+        if nombre in tabla_simbolos["constantes"]:
+            continue
+        errorIdentificadores(linea, columna, f"la variable '{nombre}' no ha sido declarada")
+    usos_pendientes.clear()
+
+# Regla Identificadores 4 (Leiner)
+def verificarConstanteDeclarada(nombre, linea, columna=None):
+    if nombre in tabla_simbolos["constantes"]:
+        errorIdentificadores(linea, columna, f"la constante '{nombre}' ya fue declarada en este ámbito")
+        return False
+    return True
+
+# Regla Identificadores 5 (Leiner)
+def verificarInicializadaCompuesta(ficha, operador, linea, columna=None):
+    if operador != '=' and ficha["estado"] == 'mut' and not ficha["inicializada"]:
+        errorIdentificadores(linea, columna, f"la variable '{ficha['nombre']}' se utiliza antes de haber sido inicializada")
+
+# Regla Identificadores 6 (Leiner)
+def verificarFuncionRepetida(nombre, linea, columna=None):
+    if nombre in tabla_simbolos["funciones"]:
+        errorIdentificadores(linea, columna, f"la función '{nombre}' ya fue declarada")
+
+# Regla Identificadores 2 (Leiner)
+llamadas_pendientes = []
+
+def verificarLlamadaFuncion(nombre, linea, columna=None):
+    if nombre in tabla_simbolos["funciones"]:
+        return
+    if buscarSimbolo(nombre) is not None:
+        return
+    llamadas_pendientes.append((nombre, linea, columna))
+
+def verificarLlamadasPendientes():
+    for nombre, linea, columna in llamadas_pendientes:
+        if nombre in tabla_simbolos["funciones"]:
+            continue
+        errorIdentificadores(linea, columna, f"la función '{nombre}' no está declarada")
+    llamadas_pendientes.clear()
+
+
+def verificarConversionAs(origen, destino, linea, columna=None):
+    co, cd = claseDeTipo(origen), claseDeTipo(destino)
+    if co is None or cd is None:
+        return
+    nombreOrigen, nombreDestino = nombreParaMensaje(origen), nombreParaMensaje(destino)
+
+    # Regla Conversión 6 (Leiner)
+    if cd == 'bool' and co != 'bool':
+        errorConversion(linea, columna, f"no se puede convertir un valor de tipo '{nombreOrigen}' a 'bool' "
+                                        f"mediante el operador 'as'")
+        return
+
+    # Regla Conversión 5 (Leiner)
+    if (co == 'char' and cd == 'decimal') or (co == 'decimal' and cd == 'char') \
+            or (co == 'bool' and cd == 'decimal'):
+        errorConversion(linea, columna, f"conversión inválida con 'as' de tipo '{nombreOrigen}' a tipo '{nombreDestino}'")
+        return
+
+    # Regla Conversión 2 (Leiner)
+    numerico = ('entero', 'decimal')
+    valida = (
+        (co in numerico and cd in numerico)
+        or (origen == 'u8' and cd == 'char')
+        or (co in ('char', 'bool') and cd == 'entero')
+        or (co == cd and co in ('char', 'bool'))
+    )
+    if not valida:
+        errorConversion(linea, columna, "conversión inválida con as")
+
+
+# Regla Conversión 1 (Leiner)
+def verificarConversionImplicita(actual, esperado, linea, columna=None):
+    numerico = ('entero', 'decimal')
+    if claseDeTipo(actual) not in numerico or claseDeTipo(esperado) not in numerico:
+        return False
+    if actual in ('int', 'float'):
+        return False
+    errorConversion(linea, columna, f"conversión implícita no permitida de '{nombreDeTipo(actual)}' a '{nombreDeTipo(esperado)}'")
+    return True
+
+
+# Fin parte de Leiner David Saltos Penafiel ///////////////////////////////////////////////////
