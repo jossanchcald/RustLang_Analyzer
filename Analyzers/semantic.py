@@ -12,6 +12,7 @@ tabla_simbolos = {
 # Funcion actual y cantidad de ciclos abiertos
 contexto = {"funcion": None, "ciclos": 0, "breaks": []}
 pila_funciones = []
+pila_if = [] # una entrada por cada if abierto
 
 ENTEROS = {'i8', 'i16', 'i32', 'i64', 'i128', 'isize', 'u8', 'u16', 'u32', 'u64', 'u128', 'usize'}
 DECIMALES = {'f32', 'f64'}
@@ -28,6 +29,7 @@ def reiniciarSemantica():
     contexto["ciclos"] = 0
     contexto["breaks"] = []
     pila_funciones.clear()
+    pila_if.clear()
     tabla_simbolos["structs"].clear()
     reiniciarAmbitos()  # Usado en pila de ámbitos (Leiner)
 
@@ -56,7 +58,7 @@ def claseDeTipo(tipo):
         return 'bool'
     if tipo == 'char':
         return 'char'
-    if tipo in ('str', 'String'):
+    if tipo in ('str', 'String', '&String'):
         return 'cadena'
     return None
 
@@ -79,6 +81,8 @@ def tiposCompatibles(actual, esperado):
         return True
     if ca != ce:
         return False
+    if ca == 'cadena': # String y &str son distintos, solo &String se convierte directamente en &str sin cast explicito
+        return actual == esperado or (actual == '&String' and esperado == 'str')
     if ca == 'entero' and actual in ENTEROS and esperado in ENTEROS:
         return actual == esperado
     if ca == 'decimal' and actual in DECIMALES and esperado in DECIMALES:
@@ -249,7 +253,9 @@ def verificarAsignacion(nombre, operador, tipoValor, linea, columna=None):
             ficha["estado"] = 'inmut' # la primera asignacion si se permite
         verificarInicializadaCompuesta(ficha, operador, linea, columna)  # Regla Identificadores 5 (Leiner)
         ficha["inicializada"] = True  # Regla Identificadores 5 (Leiner)
-        verificarTipoAsignado(nombre, ficha["tipo"], tipoValor, linea, 'asignación', columna)
+        tipoVariable = ficha["tipo"]
+        if not (operador == '+=' and tipoVariable == 'String' and tipoValor in ('str', '&String')):
+            verificarTipoAsignado(nombre, tipoVariable, tipoValor, linea, 'asignación', columna)
     elif nombre in tabla_simbolos["constantes"]:
         agregarErrorSemantico(linea, f"no se puede modificar la constante '{nombre}'")
     else:
@@ -271,6 +277,33 @@ def verificarCamposStruct(nombreStruct, campos):
             continue
         agregarErrorSemantico(linea, f"el campo '{campo}' de la estructura '{nombreStruct}' espera un valor "
                                      f"de tipo '{nombreParaMensaje(esperado)}', pero se asignó '{nombreParaMensaje(tipo)}'")
+
+# Asignacion de variables sin valor inicial segun el camino (if / else)
+# Estado (de cada variable visible) en este momento
+def estadosVisibles():
+    return [(ficha, ficha["estado"]) for ambito in tabla_simbolos["ambitos"]
+            for ficha in ambito["simbolos"].values()]
+
+def iniciarIf():
+    pila_if.append({"antes": estadosVisibles(), "then": None})
+
+# Al empezar el else: se guarda lo que paso en el then y se vuelve al estado de antes del if
+def iniciarElse():
+    if pila_if:
+        entrada = pila_if[-1]
+        entrada["then"] = [(ficha, ficha["estado"]) for ficha, _ in entrada["antes"]]
+        for ficha, estado in entrada["antes"]:
+            ficha["estado"] = estado
+
+# Al terminar: con else, queda asignada si lo hizo cualquiera de las dos ramas
+def terminarIf():
+    if not pila_if:
+        return
+    entrada = pila_if.pop()
+    if entrada["then"] is not None:
+        for ficha, estadoThen in entrada["then"]:
+            if estadoThen == 'inmut' and ficha["estado"] == 'sin_valor':
+                ficha["estado"] = 'inmut'
 
 # Fin parte de Josue Sanchez Calderon ////////////////////////////////////////////////////////////
 

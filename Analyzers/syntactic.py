@@ -124,7 +124,8 @@ def p_data_type(p):
 def p_data_type_referencia(p):
     '''data_type : AMPERSAND data_type
                  | AMPERSAND MUT data_type'''
-    p[0] = p[len(p) - 1]  # Semantico (Jared). Aqui una referencia tiene el tipo de lo referenciado
+    tipo = p[len(p) - 1]
+    p[0] = '&String' if tipo == 'String' else tipo   # &String se distingue de String
 
 def p_value(p):
     '''value : INTEGER
@@ -272,11 +273,11 @@ def p_expression_string_new(p):
 
 def p_expression_reference(p):
     'expression : AMPERSAND expression %prec UMINUS'
-    p[0] = p[2]  # Semantico (Jared)
+    p[0] = '&String' if p[2] == 'String' else p[2]  # Semantico (Jared)
 
 def p_expression_mutable_reference(p):
     'expression : AMPERSAND MUT expression %prec UMINUS'
-    p[0] = p[3]  # Semantico (Jared)
+    p[0] = '&String' if p[3] == 'String' else p[3]  # Semantico (Jared)
 
 def p_input_statement(p):
     'input_statement : IDENTIFIER DOUBLE_COLON IDENTIFIER DOUBLE_COLON IDENTIFIER PARENL PARENR PERIOD IDENTIFIER PARENL AMPERSAND MUT ident PARENR PERIOD IDENTIFIER PARENL STRING PARENR SEMICOLON'
@@ -508,23 +509,33 @@ def p_assignment(p):
 # La condicion es una 'expression'
 # 'else if' es un else seguido de otro if_statement
 # El if deja en p[0] si tiene else y si todas sus ramas devuelven valor (para las reglas de Retorno 5 y 6)
-def p_if_statement(p):
-    '''if_statement : IF expression block
-                    | IF expression block ELSE block
-                    | IF expression block ELSE if_statement'''
+def p_if_header(p):
+    'if_header : IF expression'
     reglaControl1('if', p[2], p.lineno(1))
-    conElse, devuelve = False, False
-    if len(p) > 4:
-        if p.slice[5].type == 'block':
-            conElse, devuelve = True, p[3]['devuelve'] and p[5]['devuelve']
-        elif isinstance(p[5], dict):
-            conElse, devuelve = p[5]['con_else'], p[3]['devuelve'] and p[5]['devuelve']
-    p[0] = {'clase': 'if', 'con_else': conElse, 'devuelve': devuelve}
+    iniciarIf()
 
 # Cuando falla la condicion o faltan las llaves, aqui PLY descarta tokens hasta la '{' y sigue desde ahi para que pueda avanzar
-def p_if_error(p):
-    'if_statement : IF error block'
+def p_if_header_error(p):
+    'if_header : IF error'
     addSyntacticError(p, 1, "'if' mal formado: se esperaba una condición seguida de un bloque entre llaves")
+    iniciarIf()
+
+def p_else_kw(p):
+    'else_kw : ELSE'
+    iniciarElse()
+
+def p_if_statement(p):
+    '''if_statement : if_header block
+                    | if_header block else_kw block
+                    | if_header block else_kw if_statement'''
+    terminarIf()
+    conElse, devuelve = False, False
+    if len(p) > 3:
+        if p.slice[4].type == 'block':
+            conElse, devuelve = True, p[2]['devuelve'] and p[4]['devuelve']
+        elif isinstance(p[4], dict):
+            conElse, devuelve = p[4]['con_else'], p[2]['devuelve'] and p[4]['devuelve']
+    p[0] = {'clase': 'if', 'con_else': conElse, 'devuelve': devuelve}
 
 # 3. Bucle while, break y continue
 # La cabecera 'while condicion' es una regla propia, asi al reconocerla ya sabemos que lo que sigue esta dentro de un ciclo
