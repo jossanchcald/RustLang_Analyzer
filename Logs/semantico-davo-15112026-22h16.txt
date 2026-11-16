@@ -1,0 +1,12 @@
+[[[[[ ERRORES SEMÁNTICOS ]]]]]
+Error semántico de identificadores (línea 3, columna 7): la constante 'LIMITE' ya fue declarada en este ámbito
+Error semántico de identificadores (línea 6, columna 18): repetición de variables parámetros: 'a'
+Error semántico de identificadores (línea 15, columna 4): la función 'saludar' ya fue declarada
+Error semántico de identificadores (línea 24, columna 20): la variable 'edad' no es visible en este ámbito
+Error semántico de identificadores (línea 27, columna 5): la función 'despedir' no está declarada
+Error semántico de identificadores (línea 30, columna 20): la variable 'contador' no ha sido declarada
+Error semántico de identificadores (línea 35, columna 20): la variable 'total' se utiliza antes de haber sido inicializada
+Error semántico de conversión (línea 39, columna 9): conversión implícita no permitida de 'i32' a 'f64'
+Error semántico de conversión (línea 43, columna 24): conversión inválida con as
+Error semántico de conversión (línea 47, columna 25): conversión inválida con 'as' de tipo 'char' a tipo 'f64'
+Error semántico de conversión (línea 50, columna 25): no se puede convertir un valor de tipo 'i32' a 'bool' mediante el operador 'as'
