@@ -87,3 +87,4 @@ requirements.txt     Bibliotecas necesarias
 ## Logs
 
 Cada análisis guarda un log por analizador en la carpeta `Logs/`, con el prefijo `lexico-`, `sintactico-` o `semantico-`, seguido del nombre de usuario y la fecha y hora.
+Si se generan por medio de la interfaz, en lugar del nombre de usuario llevan el nombre general `interfaz`, y se guardan los tres logs cada vez que se presiona **Analizar código**.
