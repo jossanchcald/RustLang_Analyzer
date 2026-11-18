@@ -35,9 +35,25 @@ CATEGORIAS = {
     "Semántico": {"fondo": "#ece6fb", "texto": "#6a3fc4"},
 }
 
+# Modos que se pueden elegir en el desplegable del boton de analisis
+MODOS = {
+    "completo": "Análisis completo",
+    "lexico": "Solo léxico",
+    "sintactico": "Solo sintáctico",
+    "semantico": "Solo semántico",
+}
+
+# Categorias de error que informa cada modo
+ANALIZA = {
+    "completo": ("Léxico", "Sintáctico", "Semántico"),
+    "lexico": ("Léxico",),
+    "sintactico": ("Sintáctico",),
+    "semantico": ("Semántico",),
+}
+
 
 # ---------------------------------------------------------------------------------------------
-# Analisis: ejecuta los tres analizadores y devuelve los errores y los simbolos como listas
+# Analisis: ejecuta los analizadores pedidos y devuelve los errores y los simbolos como listas
 # ---------------------------------------------------------------------------------------------
 
 PREFIJO_ERROR = re.compile(r"^Error[^(]*\([^)]*\):\s*")
@@ -82,11 +98,17 @@ def textoTipo(tipo):
     return semantic.nombreParaMensaje(tipo)
 
 
-def analizar(codigo):
+def analizar(codigo, modo="completo"):
+    # modo: 'completo', 'lexico', 'sintactico' o 'semantico'
+    # El analisis semantico ocurre mientras el parser reconoce las reglas, por eso 'sintactico' y 'semantico'
+    # ejecutan el mismo recorrido del parser; la diferencia es que errores y logs se informan solo del pedido
     lineas = codigo.split("\n")
     errores = []
+    conLexico = modo in ("completo", "lexico")
+    conSintactico = modo in ("completo", "sintactico")
+    conSemantico = modo in ("completo", "semantico")
 
-    # Lexico
+    # Lexico (siempre se tokeniza porque es barato; solo se informa si el modo lo incluye)
     lexicalErrors.clear()
     lexer.begin('INITIAL')
     lexer.lineno = 1
@@ -94,55 +116,85 @@ def analizar(codigo):
     tokens = list(lexer)
     checkUnclosedComments()
     erroresLexicos = [dict(e) for e in lexicalErrors]
-    for error in lexicalErrors:
-        errores.append({"categoria": "Léxico", "linea": error["linea"], "columna": error["columna"],
-                        "mensaje": PREFIJO_ERROR.sub("", error["mensaje"])})
+    if conLexico:
+        for error in erroresLexicos:
+            errores.append({"categoria": "Léxico", "linea": error["linea"], "columna": error["columna"],
+                            "mensaje": PREFIJO_ERROR.sub("", error["mensaje"])})
 
-    # Sintactico y semantico (el semantico ocurre mientras el parser reconoce las reglas)
-    syntacticErrors.clear()
-    semantic.reiniciarSemantica()
-    lexicalErrors.clear()
-    lexer.begin('INITIAL')
-    lexer.lineno = 1
-    parser.parse(codigo, lexer=lexer, tracking=True)
-    # Si el programa quedo incompleto (por ejemplo, un comentario sin cerrar), el parser no llega a la regla
-    # inicial y las variables y funciones pendientes no se revisan; aqui se revisan siempre
-    semantic.verificarUsosPendientes()
-    semantic.verificarLlamadasPendientes()
-    for texto in syntacticErrors:
-        linea, columna, mensaje = mensajeSintactico(texto, lineas)
-        errores.append({"categoria": "Sintáctico", "linea": linea, "columna": columna, "mensaje": mensaje})
-    for linea, texto in semantic.semanticErrors:
-        _, columna, mensaje = separarMensaje(texto)
-        errores.append({"categoria": "Semántico", "linea": linea, "columna": columna, "mensaje": mensaje})
+    # Sintactico y semantico (el parser corre solo si el modo no es 'lexico')
+    if modo != "lexico":
+        syntacticErrors.clear()
+        semantic.reiniciarSemantica()
+        lexicalErrors.clear()
+        lexer.begin('INITIAL')
+        lexer.lineno = 1
+        parser.parse(codigo, lexer=lexer, tracking=True)
+        # Si el programa quedo incompleto (por ejemplo, un comentario sin cerrar), el parser no llega a la regla
+        # inicial y las variables y funciones pendientes no se revisan; aqui se revisan siempre
+        semantic.verificarUsosPendientes()
+        semantic.verificarLlamadasPendientes()
+        if conSintactico:
+            for texto in syntacticErrors:
+                linea, columna, mensaje = mensajeSintactico(texto, lineas)
+                errores.append({"categoria": "Sintáctico", "linea": linea, "columna": columna, "mensaje": mensaje})
+        if conSemantico:
+            for linea, texto in semantic.semanticErrors:
+                _, columna, mensaje = separarMensaje(texto)
+                errores.append({"categoria": "Semántico", "linea": linea, "columna": columna, "mensaje": mensaje})
 
-    hora = guardarLogs(codigo, tokens, erroresLexicos)
+    textoLogs = guardarLogs(codigo, tokens, erroresLexicos, modo)
+    if modo == "semantico" and syntacticErrors:
+        textoLogs += " · ⚠ hay errores sintácticos"
     errores.sort(key=lambda e: (e["linea"] or 0, e["columna"] or 0))
     for error in errores:
         numero = error["linea"]
         error["fragmento"] = lineas[numero - 1].strip() if numero and numero <= len(lineas) else ""
 
-    filasTokens = [(t.type, str(t.value), t.lineno, findColumn(codigo, t.lexpos)) for t in tokens]
-    return errores, tablaSimbolos(tokens), hora, filasTokens
+    filasTokens = [(t.type, str(t.value), t.lineno, findColumn(codigo, t.lexpos)) for t in tokens] if conLexico else []
+    simbolos = tablaSimbolos(tokens) if conSemantico else []
+    return errores, simbolos, textoLogs, filasTokens
 
 
-def guardarLogs(codigo, tokens, erroresLexicos):
-    # Los mismos tres logs que genera main.py: lexico, sintactico y semantico
+def rutaLogUnica(prefijo, formato, ahora):
+    # Si ya existe un log del mismo tipo en el mismo minuto, agrega -2, -3... para no sobrescribirlo
+    base = f"{prefijo}-{NOMBRE_LOG}-{ahora.strftime(formato)}"
+    ruta = LOGS / f"{base}.txt"
+    numero = 2
+    while ruta.exists():
+        ruta = LOGS / f"{base}-{numero}.txt"
+        numero += 1
+    return ruta
+
+
+def guardarLogs(codigo, tokens, erroresLexicos, modo):
+    # Los mismos logs que genera main.py (lexico, sintactico y semantico), pero solo los del modo elegido
     ahora = datetime.now()
     LOGS.mkdir(parents=True, exist_ok=True)
-    lexico = ["[[[[[ TOKENS RECONOCIDOS ]]]]]"]
-    for tok in tokens:
-        lexico.append(f"[{tok.type}] -> {tok.value} (Línea {tok.lineno}, Columna {findColumn(codigo, tok.lexpos)})")
-    if erroresLexicos:
-        lexico.append("\n [[[[[ ERRORES LÉXICOS ]]]]]")
-        lexico += [e["mensaje"] for e in erroresLexicos]
-    sintactico = ["[[[[[ ERRORES SINTÁCTICOS ]]]]]"] + (list(syntacticErrors) or ["No se encontraron errores sintácticos."])
-    semantico = ["[[[[[ ERRORES SEMÁNTICOS ]]]]]"] + (semantic.listaErroresSemanticos() or ["No se encontraron errores semánticos."])
-    for prefijo, contenido, formato in (("lexico", lexico, '%d-%m-%Y-%Hh%M'), ("sintactico", sintactico, '%d-%m-%Y-%Hh%M'),
-                                        ("semantico", semantico, '%d%m%Y-%Hh%M')):
-        nombre = f"{prefijo}-{NOMBRE_LOG}-{ahora.strftime(formato)}.txt"
-        (LOGS / nombre).write_text("\n".join(contenido), encoding="utf-8")
-    return ahora.strftime('%Hh%M')
+    pendientes = []
+
+    if modo in ("completo", "lexico"):
+        lexico = ["[[[[[ TOKENS RECONOCIDOS ]]]]]"]
+        for tok in tokens:
+            lexico.append(f"[{tok.type}] -> {tok.value} (Línea {tok.lineno}, Columna {findColumn(codigo, tok.lexpos)})")
+        if erroresLexicos:
+            lexico.append("\n [[[[[ ERRORES LÉXICOS ]]]]]")
+            lexico += [e["mensaje"] for e in erroresLexicos]
+        pendientes.append(("lexico", lexico, '%d-%m-%Y-%Hh%M'))
+
+    if modo in ("completo", "sintactico"):
+        sintactico = ["[[[[[ ERRORES SINTÁCTICOS ]]]]]"] + (list(syntacticErrors) or ["No se encontraron errores sintácticos."])
+        pendientes.append(("sintactico", sintactico, '%d-%m-%Y-%Hh%M'))
+
+    if modo in ("completo", "semantico"):
+        semantico = ["[[[[[ ERRORES SEMÁNTICOS ]]]]]"] + (semantic.listaErroresSemanticos() or ["No se encontraron errores semánticos."])
+        pendientes.append(("semantico", semantico, '%d%m%Y-%Hh%M'))
+
+    for prefijo, contenido, formato in pendientes:
+        rutaLogUnica(prefijo, formato, ahora).write_text("\n".join(contenido), encoding="utf-8")
+
+    cantidad = len(pendientes)
+    palabra = "logs guardados" if cantidad != 1 else "log guardado"
+    return f"{cantidad} {palabra} en Logs/ ({ahora.strftime('%Hh%M')})"
 
 
 def tablaSimbolos(tokens):
@@ -337,11 +389,13 @@ class Interfaz(tk.Tk):
         self.errores = []
         self.filtro = "Todos"
         self.archivo = "programa.rs"
+        self.analizado = False
+        self.modoAnalizado = "completo"  # modo del ultimo analisis ejecutado
+        self.varModo = tk.StringVar(value="completo")  # modo elegido en el desplegable
         self.estilos()
         self.cargarImagenes()
         self.construirCabecera()
         self.construirCuerpo()
-        self.analizado = False
         self.mostrarDiagnostico()
 
     def estilos(self):
@@ -389,7 +443,16 @@ class Interfaz(tk.Tk):
         self.botonEjemplos = self.boton(derecha, "Algoritmos", self.mostrarEjemplos)
         self.botonEjemplos.pack(side="left", padx=4)
         self.boton(derecha, "Limpiar", self.limpiar).pack(side="left", padx=4)
-        self.boton(derecha, "▶ Analizar código", self.analizarCodigo, principal=True).pack(side="left", padx=(4, 0))
+
+        # Boton dividido: a la izquierda ejecuta el analisis elegido, a la derecha el desplegable para elegirlo
+        division = tk.Frame(derecha, bg="#f5b3cb")
+        division.pack(side="left", padx=(4, 0))
+        self.botonAnalizar = self.boton(division, f"▶ {MODOS[self.varModo.get()]}", self.analizarCodigo, principal=True)
+        self.botonAnalizar.configure(width=15)  # ancho fijo para que no se mueva al cambiar de modo
+        self.botonAnalizar.pack(side="left")
+        self.botonModo = self.boton(division, "▾", self.mostrarModos, principal=True)
+        self.botonModo.configure(padx=1)
+        self.botonModo.pack(side="left", padx=(1, 0))
 
     def construirCuerpo(self):
         cuerpo = tk.Canvas(self, bg=FONDO, highlightthickness=0)
@@ -529,11 +592,25 @@ class Interfaz(tk.Tk):
         y = self.botonEjemplos.winfo_rooty() + self.botonEjemplos.winfo_height()
         menu.tk_popup(x, y)
 
+    def mostrarModos(self):
+        # Desplegable del boton de analisis: solo cambia el modo, el analisis se ejecuta con el boton
+        menu = tk.Menu(self, tearoff=0, font=self.fuentes["normal"])
+        for clave, nombre in MODOS.items():
+            menu.add_radiobutton(label=nombre, variable=self.varModo, value=clave,
+                                 command=self.actualizarBotonAnalizar)
+        x = self.botonAnalizar.winfo_rootx()
+        y = self.botonAnalizar.winfo_rooty() + self.botonAnalizar.winfo_height()
+        menu.tk_popup(x, y)
+
+    def actualizarBotonAnalizar(self):
+        self.botonAnalizar.configure(text=f"▶ {MODOS[self.varModo.get()]}")
+
     def cargar(self, ruta):
+        # Solo muestra el codigo en el editor; el analisis lo decide el usuario con el boton de analisis
+        self.reiniciarResultados()
         self.editor.poner(ruta.read_text(encoding="utf-8"))
         self.archivo = ruta.name
         self.tarjetaEditor.titulo.configure(text=f"1. Editor de código · {self.archivo}")
-        self.analizarCodigo()
 
     def crearTabla(self, padre, nombre, columnas, anchos):
         marco = tk.Frame(padre, bg=TARJETA)
@@ -548,6 +625,10 @@ class Interfaz(tk.Tk):
         self.vistas[nombre] = marco
         return tabla
 
+    def corrio(self, categoria):
+        # True si el ultimo analisis incluyo esa categoria (antes de analizar nada se considera que si)
+        return not self.analizado or categoria in ANALIZA[self.modoAnalizado]
+
     def cambiarVista(self, nombre):
         self.vista = nombre
         for clave, marco in self.vistas.items():
@@ -555,19 +636,24 @@ class Interfaz(tk.Tk):
                 marco.pack(fill="both", expand=True)
             else:
                 marco.pack_forget()
-        cantidades = {"Símbolos": len(self.tabla.get_children()), "Tokens": len(self.tablaTokens.get_children())}
+        # Si el modo no genera esa vista se muestra "—" en lugar de 0 para no dar a entender que no hay nada
+        cantidades = {
+            "Símbolos": len(self.tabla.get_children()) if self.corrio("Semántico") else "—",
+            "Tokens": len(self.tablaTokens.get_children()) if self.corrio("Léxico") else "—",
+        }
         for clave, boton in self.botonesVista.items():
             activo = clave == nombre
             boton.configure(text=f"{clave} · {cantidades[clave]}", bg=ACENTO if activo else TARJETA,
                             fg=ACENTO_TEXTO if activo else TEXTO, activebackground=ACENTO,
                             highlightbackground=ACENTO if activo else BORDE)
 
-    def limpiar(self):
-        self.editor.poner("")
-        self.archivo = "programa.rs"
-        self.tarjetaEditor.titulo.configure(text="1. Editor de código · programa.rs")
+    def reiniciarResultados(self):
+        # Borra los resultados del analisis anterior (errores, tablas, marcas) sin tocar el texto del editor
         self.errores = []
         self.analizado = False
+        self.modoAnalizado = "completo"
+        self.filtro = "Todos"
+        self.editor.limpiarMarcas()
         self.tabla.delete(*self.tabla.get_children())
         self.tablaTokens.delete(*self.tablaTokens.get_children())
         self.avisoLogs.configure(text="")
@@ -576,15 +662,25 @@ class Interfaz(tk.Tk):
         if self.gato is not None:
             self.gato.dibujar("abiertos")
 
+    def limpiar(self):
+        self.editor.poner("")
+        self.archivo = "programa.rs"
+        self.tarjetaEditor.titulo.configure(text="1. Editor de código · programa.rs")
+        self.reiniciarResultados()
+
     def analizarCodigo(self):
         codigo = self.editor.obtener()
         if not codigo.strip():
             self.limpiar()
             return
+        modo = self.varModo.get()
         self.analizado = True
+        self.modoAnalizado = modo
+        if self.filtro != "Todos" and self.filtro not in ANALIZA[modo]:
+            self.filtro = "Todos"
         try:
-            self.errores, simbolos, hora, filasTokens = analizar(codigo)
-            self.avisoLogs.configure(text=f"Logs guardados en Logs/ ({hora})")
+            self.errores, simbolos, textoLogs, filasTokens = analizar(codigo, modo)
+            self.avisoLogs.configure(text=textoLogs)
         except Exception as error:
             self.errores, simbolos, filasTokens = [{"categoria": "Sintáctico", "linea": None, "columna": None,
                                                     "mensaje": f"no se pudo completar el análisis ({error})",
@@ -614,13 +710,17 @@ class Interfaz(tk.Tk):
         for hijo in self.filtros.winfo_children():
             hijo.destroy()
         for nombre in ("Todos", "Léxico", "Sintáctico", "Semántico"):
+            # Una categoria que el modo no ejecuto se muestra con "—" y deshabilitada, no con 0
+            omitido = nombre != "Todos" and not self.corrio(nombre)
             cantidad = total if nombre == "Todos" else sum(1 for e in self.errores if e["categoria"] == nombre)
             activo = nombre == self.filtro
-            tk.Button(self.filtros, text=f"{nombre} · {cantidad}", command=lambda n=nombre: self.cambiarFiltro(n),
+            tk.Button(self.filtros, text=f"{nombre} · {'—' if omitido else cantidad}",
+                      command=lambda n=nombre: self.cambiarFiltro(n),
+                      state="disabled" if omitido else "normal", disabledforeground=TEXTO_SUAVE,
                       bg=ACENTO if activo else TARJETA, fg=ACENTO_TEXTO if activo else TEXTO,
                       activebackground=ACENTO, relief="flat", font=self.fuentes["normal"], padx=10, pady=4,
-                      cursor="hand2", highlightthickness=1, highlightbackground=ACENTO if activo else BORDE,
-                      borderwidth=0).pack(side="left", padx=(0, 6))
+                      cursor="arrow" if omitido else "hand2", highlightthickness=1,
+                      highlightbackground=ACENTO if activo else BORDE, borderwidth=0).pack(side="left", padx=(0, 6))
 
         self.lista.vaciar()
         visibles = [e for e in self.errores if self.filtro == "Todos" or e["categoria"] == self.filtro]
@@ -629,11 +729,13 @@ class Interfaz(tk.Tk):
             dibujo.pack(pady=(24, 4))
             gatitos.gatoSentado(dibujo, 130, 122, 0.95, "crema", "felices" if self.analizado else "abiertos")
             if not self.analizado:
-                texto = "Escribe tu código o abre uno desde Algoritmos,\ny presiona Analizar código."
+                texto = "Escribe tu código o abre uno desde Algoritmos,\ny luego presiona el botón de análisis."
             elif total:
                 texto = "No hay errores en esta categoría."
-            else:
+            elif self.modoAnalizado == "completo":
                 texto = "¡Todo en orden! El código no tiene errores."
+            else:
+                texto = f"Sin errores en el análisis\n({MODOS[self.modoAnalizado].lower()})."
             tk.Label(self.lista.interior, text=texto, justify="center",
                      bg=TARJETA, fg=TEXTO_SUAVE, font=self.fuentes["normal"]).pack(pady=(0, 12))
         for error in visibles:
