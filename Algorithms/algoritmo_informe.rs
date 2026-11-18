@@ -82,9 +82,6 @@ fn main() {
     // ERROR SEMANTICO: operacion aritmetica invalida
     let division = activo / edad;
 
-    // ERROR SINTACTICO: falta el punto y coma
-    let mensaje = "Analisis de Rust"
-
     // ERROR SEMANTICO: variable sin inicializar
     let mut puntos: i32;
     puntos += 10;
@@ -96,15 +93,18 @@ fn main() {
     let alumno = Estudiante {
         nombre: String::from("Carlos"),
         edad: 20,
-        promedio: 9.5,
+        promedio: 9.5
     };
 
     // ERROR SEMANTICO: campo con tipo incorrecto
     let otro = Estudiante {
         nombre: String::from("Maria"),
         edad: "veinte",
-        promedio: 8.5,
+        promedio: 8.5
     };
+
+    // ERROR SINTACTICO: falta el punto y coma
+    let mensaje = "Analisis de Rust"
 
     println!("Fin del programa");
 }
