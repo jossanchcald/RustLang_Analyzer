@@ -28,9 +28,6 @@ reserved_words = {
     'in' : 'IN',
     'as' : 'AS',
     'println' : 'PRINTLN',
-
-    'true': 'BOOLEAN_T',
-    'false' : 'BOOLEAN_F'
 }
 
 # Diccionario de tipos de datos
@@ -755,20 +752,25 @@ def t_comment_error(t):
 
 # Fin parte de Jared Beltran //////////////////////////////////////////////////////////////////////////////////////////////////
 
+
+# Inicio Parte de Josue Sanchez Calderon //////////////////////////////////////////////////////////////////////////////////////////////////
+
+@TOKEN(r'(?:true|false)(?![a-zA-Z0-9_])')
+def t_BOOLEAN(t):
+    t.value = (t.value == 'true') # True o False de Python
+    return t
+
+# Fin Parte de Josue Sanchez Calderon //////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 # Inicio Parte de Leiner David Saltos Penafiel //////////////////////////////////////////////////////////////////////////////////////////////////
 
 regexID = r'[a-zA-Z_][a-zA-Z0-9_]*'
 @TOKEN(regexID)
 def t_IDENTIFIER(t):
     t.type = reserved_words.get(t.value, 'IDENTIFIER')
-
-    if t.type in ('BOOLEAN_T', 'BOOLEAN_F'):
-        t.value = (t.type == 'BOOLEAN_T') # True o False de Python
-        t.type = 'BOOLEAN'
-
-    elif (t.type == 'IDENTIFIER'):
+    if t.type == 'IDENTIFIER':
         t.type = typesNames.get(t.value, 'IDENTIFIER')
-
     return t
 
 # Regla para contar lineas para los mensajes de error
